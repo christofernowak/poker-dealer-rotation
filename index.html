@@ -606,6 +606,36 @@ window.addEventListener('online',()=>document.getElementById('offbar').classList
 window.addEventListener('offline',()=>document.getElementById('offbar').classList.add('show'));
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
+/* ── SYNC: atualiza todos os dispositivos/abas quando o floor salva algo ── */
+window.addEventListener('storage', e => {
+  if(e.key !== 'pdr_pwa') return;
+  if(document.getElementById('app').style.display === 'none') return;
+  load(); /* recarrega S do localStorage atualizado */
+  refreshAll();
+  toast('Dados atualizados');
+});
+
+/* ── SYNC: recarrega estado ao voltar para a aba ou reabrir o app ── */
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState !== 'visible') return;
+  if(document.getElementById('app').style.display === 'none') return;
+  const before = JSON.stringify(S);
+  load();
+  if(JSON.stringify(S) !== before) {
+    refreshAll();
+  }
+});
+
+function refreshAll(){
+  renderTables();
+  renderDealers();
+  recalc();
+  const activeTab = ['mesas','dealers','rotacao','relatorio'].find(
+    t => document.getElementById('tab-'+t).style.display !== 'none'
+  );
+  if(activeTab === 'relatorio') renderReport();
+}
+
 function startApp(){
   load();
   document.getElementById('login-screen').style.display='none';
@@ -617,7 +647,15 @@ function startApp(){
     window._clockStarted=true;
     updateClock();
     setInterval(updateClock,1000);
-    setInterval(()=>{if(document.getElementById('app').style.display!=='none'){renderDealers();if(document.getElementById('tab-relatorio').style.display!=='none')renderReport();}},30000);
+    /* sync leve a cada 5s como fallback para navegadores que bloqueiam storage event */
+    setInterval(()=>{
+      if(document.getElementById('app').style.display==='none') return;
+      const before=JSON.stringify(S);
+      load();
+      if(JSON.stringify(S)!==before){
+        refreshAll();
+      }
+    }, 5000);
   }
   reqNotif();
   if(!navigator.onLine)document.getElementById('offbar').classList.add('show');
