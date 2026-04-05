@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#0a1f10"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Dealer Rotation"/>
+<meta name="description" content="Gerenciador de revezamento de dealers para torneios de poker"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<title>Poker Dealer Rotation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --gold:#c9a84c;--goldf:#e8c76a;
+  --cb:#0f2d1a;--bg:#071a0e;
+  --tx:#f0e6c8;--txm:#9a8a6a;
+  --green:#2d7a42;--red:#c0392b;--blue:#2980b9;--pur:#8e44ad;--ora:#d35400;
+  --r:10px;
+}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,serif;overscroll-behavior:none}
+
+/* LOGIN */
+#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:var(--bg)}
+.login-logo{font-size:52px;margin-bottom:6px;text-align:center}
+.login-title{font-size:22px;color:var(--gold);letter-spacing:3px;font-weight:bold;text-align:center;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--txm);margin-bottom:32px;text-align:center}
+.login-card{width:100%;max-width:340px;background:var(--cb);border:1px solid rgba(201,168,76,.4);border-radius:14px;padding:24px}
+.login-card label{display:block;font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.login-card input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:7px;padding:11px 12px;color:var(--tx);font-family:inherit;font-size:15px;margin-bottom:16px;-webkit-appearance:none}
+.login-card input:focus{outline:none;border-color:var(--gold)}
+.login-btn{width:100%;padding:13px;background:var(--gold);color:#0a1f10;border:none;border-radius:7px;font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;letter-spacing:1px}
+.login-btn:active{background:var(--goldf)}
+.login-error{background:rgba(192,57,43,.2);border:1px solid rgba(192,57,43,.5);border-radius:7px;padding:9px 12px;font-size:12px;color:#ff8a7a;text-align:center;margin-top:12px;display:none}
+.login-error.show{display:block}
+
+/* APP */
+#app{display:none;max-width:480px;margin:0 auto;min-height:100%;padding-bottom:90px}
+.hdr{background:#0a1f10;padding:10px 14px;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hdr-center{flex:1;text-align:center}
+.hdr h1{font-size:15px;color:var(--gold);letter-spacing:2px;font-weight:bold}
+.hdr p{font-size:10px;color:var(--txm);margin-top:1px}
+.role-badge{font-size:9px;padding:3px 8px;border-radius:8px;font-weight:bold;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+.role-floor{background:rgba(201,168,76,.2);color:var(--gold);border:1px solid rgba(201,168,76,.4)}
+.role-dealer{background:rgba(41,128,185,.2);color:#7fc8f8;border:1px solid rgba(41,128,185,.4)}
+.logout-btn{background:transparent;border:1px solid rgba(201,168,76,.25);color:var(--txm);font-size:10px;cursor:pointer;padding:4px 8px;font-family:inherit;border-radius:5px;flex-shrink:0}
+.logout-btn:active{color:var(--tx)}
+
+.timer-box{background:var(--cb);border:1px solid var(--gold);border-radius:var(--r);padding:12px 16px;margin:10px;text-align:center}
+.timer-box.urgent{border-color:var(--red);animation:pb 1s infinite}
+.timer-box.urgent .cd{color:var(--red)}
+@keyframes pb{0%,100%{border-color:var(--red)}50%{border-color:#ff6b6b}}
+.cd{font-size:34px;color:var(--gold);font-weight:bold;font-family:'Courier New',monospace}
+.lbl{font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:1px}
+.tdsp{font-size:12px;color:var(--txm);margin-top:2px}
+
+/* Notificação — visível para todos */
+.notif{background:#3a0e0e;border:2px solid var(--red);border-radius:var(--r);padding:14px 14px 10px;margin:10px;display:none}
+.notif.show{display:block}
+.notif-title{font-size:14px;color:#ff8a7a;font-weight:bold;text-align:center;letter-spacing:1px;margin-bottom:10px}
+.notif-moves{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.notif-move{background:rgba(255,255,255,.06);border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px}
+.nm-name{font-size:14px;font-weight:bold;flex:1}
+.nm-tbl{font-size:12px;color:var(--txm)}
+.nm-badge{font-size:9px;padding:2px 6px;border-radius:5px;font-weight:bold}
+.nm-e{background:rgba(45,122,66,.4);color:#6ddc8a}
+.nm-2{background:rgba(192,57,43,.4);color:#ff8a7a}
+.nm-3{background:rgba(142,68,173,.4);color:#d7a8ff}
+.nm-4{background:rgba(211,84,0,.4);color:#ffb07a}
+.nm-5{background:rgba(22,160,133,.4);color:#7fffd4}
+.notif-rest{font-size:11px;color:var(--txm);text-align:center;padding-top:6px;border-top:1px solid rgba(255,255,255,.07)}
+
+.tabs{display:flex;background:var(--cb);border-bottom:1px solid rgba(201,168,76,.3);position:sticky;top:55px;z-index:99}
+.tab{flex:1;padding:9px 2px;text-align:center;font-size:10px;color:var(--txm);cursor:pointer;border:none;background:transparent;font-family:inherit;border-bottom:2px solid transparent;letter-spacing:.5px;transition:color .2s,border-color .2s}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.sec{margin:0 10px 10px}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid rgba(201,168,76,.25)}
+.sec-ttl{font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:1px}
+.badge{background:var(--gold);color:#0a1f10;font-size:10px;font-weight:bold;padding:2px 7px;border-radius:8px}
+.btn{border:1px solid var(--gold);background:transparent;color:var(--gold);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;-webkit-appearance:none}
+.btn:active{background:rgba(201,168,76,.2)}
+.btn.pri{background:var(--gold);color:#0a1f10;font-weight:bold}
+.btn.pri:active{background:var(--goldf)}
+.btn.dng{border-color:var(--red);color:var(--red)}
+.btn.dng:active{background:rgba(192,57,43,.2)}
+.btn.sm{padding:4px 8px;font-size:10px}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.tcard{background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:var(--r);padding:9px}
+.tcard.active{border-color:var(--green)}
+.tcard .tnum{font-size:10px;color:var(--txm);display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.tcard .tnum input{background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.3);border-radius:4px;color:var(--tx);font-size:11px;padding:2px 4px;width:36px;font-family:inherit;text-align:center;-webkit-appearance:none}
+.tcard .tnum input:focus{outline:none;border-color:var(--gold)}
+.tcard .dname{font-size:13px;color:var(--tx);font-weight:bold;margin:3px 0;min-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .dname.empty{color:var(--txm);font-style:italic;font-weight:normal}
+.tcard select{width:100%;background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:5px;padding:4px 5px;color:var(--tx);font-size:10px;margin-bottom:5px;-webkit-appearance:none}
+.dlst{display:flex;flex-direction:column;gap:5px}
+.ditem{background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:var(--r);padding:9px 11px;display:flex;align-items:center;gap:8px}
+.ditem.on-break{border-color:var(--blue)}
+.ditem.on-table{border-color:var(--green)}
+.ditem.on-double{border-color:var(--red)}
+.ditem.on-triple{border-color:var(--pur)}
+.ditem.on-more{border-color:var(--ora)}
+.ditem.pending{border-color:#555;opacity:.7}
+.dav{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex-shrink:0}
+.dinf{flex:1;min-width:0}
+.dinf .nm{font-size:13px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dinf .mt{font-size:10px;color:var(--txm);margin-top:1px}
+.dst{font-size:9px;padding:2px 5px;border-radius:7px;flex-shrink:0;font-weight:bold;letter-spacing:.4px}
+.s-mesa{background:rgba(45,122,66,.3);color:#6ddc8a;border:1px solid rgba(45,122,66,.5)}
+.s-fora{background:rgba(41,128,185,.3);color:#7fc8f8;border:1px solid rgba(41,128,185,.5)}
+.s-pend{background:rgba(80,80,80,.4);color:#aaa;border:1px solid #555}
+.s-2x{background:rgba(192,57,43,.3);color:#ff8a7a;border:1px solid rgba(192,57,43,.5)}
+.s-3x{background:rgba(142,68,173,.3);color:#d7a8ff;border:1px solid rgba(142,68,173,.5)}
+.s-4x{background:rgba(211,84,0,.3);color:#ffb07a;border:1px solid rgba(211,84,0,.5)}
+.s-5x{background:rgba(22,160,133,.3);color:#7fffd4;border:1px solid rgba(22,160,133,.5)}
+.aform{background:var(--cb);border:1px dashed rgba(201,168,76,.35);border-radius:var(--r);padding:11px}
+.aform input[type=text],.aform input[type=time]{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:5px;padding:8px 9px;color:var(--tx);font-family:inherit;font-size:14px;margin-bottom:7px;-webkit-appearance:none}
+.aform input::placeholder{color:var(--txm)}
+.aform input:focus{outline:none;border-color:var(--gold)}
+.arow{display:flex;gap:7px;align-items:center}
+.arow label{font-size:11px;color:var(--txm);white-space:nowrap}
+.rplan{background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:var(--r);padding:11px}
+.rttl{font-size:11px;color:var(--gold);margin-bottom:7px}
+.rsub{font-size:10px;color:var(--txm);margin:5px 0 3px;border-top:1px solid rgba(255,255,255,.05);padding-top:5px}
+.mitem{display:flex;align-items:flex-start;gap:7px;font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mitem:last-child{border-bottom:none}
+.marr{color:var(--gold);min-width:14px;padding-top:1px}
+.mname{font-weight:bold;font-size:12px}
+.mlabel{padding:1px 5px;border-radius:4px;font-size:9px;font-weight:bold;margin-left:4px;flex-shrink:0}
+.ml-normal{background:rgba(45,122,66,.3);color:#6ddc8a}
+.ml-2x{background:rgba(192,57,43,.3);color:#ff8a7a}
+.ml-3x{background:rgba(142,68,173,.3);color:#d7a8ff}
+.ml-4x{background:rgba(211,84,0,.3);color:#ffb07a}
+.ml-5x{background:rgba(22,160,133,.3);color:#7fffd4}
+.ml-rest{background:rgba(41,128,185,.3);color:#7fc8f8}
+.slst{display:flex;flex-direction:column;gap:5px}
+.sitem{background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:var(--r);padding:9px 11px;display:flex;justify-content:space-between;align-items:center}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gold);color:#0a1f10;padding:9px 18px;border-radius:18px;font-weight:bold;font-size:12px;z-index:300;transition:transform .35s;white-space:nowrap;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.offline-bar{background:#444;color:#ddd;text-align:center;font-size:11px;padding:4px;display:none}
+.offline-bar.show{display:block}
+</style>
+</head>
+<body>
+<div class="offline-bar" id="offbar">Modo offline — dados salvos localmente</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-logo">♠</div>
+  <div class="login-title">DEALER ROTATION</div>
+  <div class="login-sub">Sistema de Revezamento de Poker</div>
+  <div class="login-card">
+    <label>Usuario</label>
+    <input type="text" id="l-user" placeholder="usuario" autocomplete="username" autocapitalize="none" autocorrect="off"/>
+    <label>Senha</label>
+    <input type="password" id="l-pass" placeholder="senha" autocomplete="current-password"/>
+    <button class="login-btn" onclick="doLogin()">ENTRAR</button>
+    <div class="login-error" id="l-err">Usuario ou senha incorretos</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="hdr">
+    <span class="role-badge" id="role-badge">FLOOR</span>
+    <div class="hdr-center">
+      <h1>♠ DEALER ROTATION ♦</h1>
+      <p id="ct"></p>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Sair</button>
+  </div>
+
+  <!-- Notificacao visivel para TODOS os perfis -->
+  <div class="notif" id="nb">
+    <div class="notif-title">♠ HORA DO REVEZAMENTO! ♦</div>
+    <div class="notif-moves" id="notif-moves"></div>
+    <div class="notif-rest" id="notif-rest"></div>
+  </div>
+
+  <div class="timer-box" id="tb">
+    <div class="lbl">Proximo Revezamento</div>
+    <div class="cd" id="cd">--:--</div>
+    <div class="tdsp" id="td"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('mesas')">MESAS</button>
+    <button class="tab" onclick="showTab('dealers')">DEALERS</button>
+    <button class="tab" onclick="showTab('rotacao')">ROTACAO</button>
+    <button class="tab" onclick="showTab('relatorio')">RELATORIO</button>
+  </div>
+
+  <div id="tab-mesas">
+    <div class="sec" style="margin-top:10px">
+      <div class="sec-hdr">
+        <span class="sec-ttl">Mesas Abertas</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <span class="badge" id="tc">0</span>
+          <button class="btn pri sm floor-only" onclick="addTable()">+ Mesa</button>
+        </div>
+      </div>
+      <div class="tgrid" id="tg"></div>
+    </div>
+  </div>
+
+  <div id="tab-dealers" style="display:none">
+    <div class="sec" style="margin-top:10px">
+      <div class="sec-hdr"><span class="sec-ttl">Dealers</span><span class="badge" id="dc">0</span></div>
+      <div class="aform floor-only" id="dealer-add-form" style="margin-bottom:9px">
+        <input type="text" id="dni" placeholder="Nome do dealer..." maxlength="24" autocomplete="off"/>
+        <div class="arow">
+          <label>Entrada:</label>
+          <input type="time" id="dti" style="flex:1;margin-bottom:0;width:auto"/>
+          <button class="btn pri sm" onclick="addDealer()">Adicionar</button>
+        </div>
+      </div>
+      <div class="dlst" id="dl"></div>
+    </div>
+  </div>
+
+  <div id="tab-rotacao" style="display:none">
+    <div class="sec" style="margin-top:10px">
+      <div class="sec-hdr"><span class="sec-ttl">Plano de Rotacao</span><button class="btn sm" onclick="recalc()">Recalcular</button></div>
+      <div id="rpb"></div>
+    </div>
+    <div class="sec floor-only" id="exec-rot-sec">
+      <div style="background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:var(--r);padding:11px;text-align:center">
+        <p style="font-size:11px;color:var(--txm);margin-bottom:9px">Aplicar rotacao planejada agora</p>
+        <button class="btn pri" onclick="execRot()" style="width:100%;padding:12px;font-size:14px">EXECUTAR REVEZAMENTO AGORA</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-relatorio" style="display:none">
+    <div class="sec" style="margin-top:10px">
+      <div class="sec-hdr"><span class="sec-ttl">Horas Trabalhadas</span><button class="btn sm" onclick="renderReport()">Atualizar</button></div>
+      <div class="slst" id="sl"></div>
+    </div>
+    <div class="sec floor-only">
+      <div style="background:var(--cb);border:1px solid rgba(192,57,43,.3);border-radius:var(--r);padding:11px;text-align:center">
+        <p style="font-size:11px;color:var(--txm);margin-bottom:9px">Encerrar o dia e zerar todos os dados</p>
+        <button class="btn dng" onclick="resetDay()" style="width:100%;padding:10px">ENCERRAR DIA</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const USERS={'floor01':{pass:'123456',role:'floor'},'dealer':{pass:'123',role:'dealer'}};
+let currentUser=null,currentRole=null;
+
+function doLogin(){
+  const u=document.getElementById('l-user').value.trim().toLowerCase();
+  const p=document.getElementById('l-pass').value;
+  const err=document.getElementById('l-err');
+  if(USERS[u]&&USERS[u].pass===p){
+    currentUser=u;currentRole=USERS[u].role;
+    err.classList.remove('show');
+    try{sessionStorage.setItem('pdr_sess',JSON.stringify({u,role:currentRole}))}catch(e){}
+    startApp();
+  }else{
+    err.classList.add('show');
+    document.getElementById('l-pass').value='';
+  }
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();
+});
+
+function doLogout(){
+  currentUser=null;currentRole=null;
+  try{sessionStorage.removeItem('pdr_sess')}catch(e){}
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-user').value='';
+  document.getElementById('l-pass').value='';
+}
+
+function applyRoleUI(){
+  const isFloor=currentRole==='floor';
+  document.querySelectorAll('.floor-only').forEach(el=>{el.style.display=isFloor?'':'none'});
+  const rb=document.getElementById('role-badge');
+  rb.textContent=isFloor?'FLOOR':'DEALER';
+  rb.className='role-badge '+(isFloor?'role-floor':'role-dealer');
+}
+
+/* STATE */
+const COLORS=['#c9a84c','#2980b9','#27ae60','#8e44ad','#e67e22','#e74c3c','#1abc9c','#d35400','#16a085','#f39c12','#3498db','#e91e63'];
+let S={tables:[],dealers:[],rotCount:0,lastRot:null};
+function save(){try{localStorage.setItem('pdr_pwa',JSON.stringify(S))}catch(e){}}
+function load(){try{const s=localStorage.getItem('pdr_pwa');if(s)S=JSON.parse(s)}catch(e){}}
+
+const now=()=>new Date();
+const fmt=d=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const fmts=d=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+function parseT(s){const[h,m]=s.split(':').map(Number);const d=new Date();d.setHours(h,m,0,0);return d}
+function fmtDur(mins){const h=Math.floor(mins/60),m=Math.round(mins%60);return h>0?`${h}h${m.toString().padStart(2,'0')}m`:`${m}m`}
+function initials(name){return name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}
+
+function nextRot(){
+  const n=now();let best=null;
+  for(let hh=n.getHours();hh<=n.getHours()+2;hh++)
+    for(const mm of[23,53]){const t=new Date(n);t.setHours(hh,mm,0,0);if(t>n&&(!best||t<best))best=t;}
+  return best;
+}
+function isAvailable(d){return new Date(d.startTime)<=now()}
+function firstRotTime(d){
+  const st=new Date(d.startTime);let best=null;
+  for(let hh=st.getHours();hh<=st.getHours()+2;hh++)
+    for(const mm of[23,53]){const t=new Date(st);t.setHours(hh,mm,0,0);if(t>=st&&(!best||t<best))best=t;}
+  return best;
+}
+function isAvailableAtNextRot(d){const nxt=nextRot();const frt=firstRotTime(d);if(!frt)return false;return frt<=nxt;}
+function dealerStyle(d){
+  if(!isAvailable(d))return{cls:'s-pend',lbl:'AGUARD'};
+  const c=d.covCount||0;
+  if(c===0)return{cls:'s-fora',lbl:'FORA'};if(c===1)return{cls:'s-mesa',lbl:'MESA'};
+  if(c===2)return{cls:'s-2x',lbl:'2X'};if(c===3)return{cls:'s-3x',lbl:'3X'};
+  if(c===4)return{cls:'s-4x',lbl:'4X'};return{cls:'s-5x',lbl:c+'X'};
+}
+function itemCls(d){
+  if(!isAvailable(d))return'pending';
+  const c=d.covCount||0;
+  if(c===0)return'on-break';if(c===1)return'on-table';
+  if(c===2)return'on-double';if(c===3)return'on-triple';return'on-more';
+}
+
+/* CLOCK */
+let rotTriggered=false;
+function updateClock(){
+  const n=now();
+  document.getElementById('ct').textContent=fmt(n);
+  const nxt=nextRot();
+  const diff=Math.max(0,Math.floor((nxt-n)/1000));
+  document.getElementById('cd').textContent=`${Math.floor(diff/60).toString().padStart(2,'0')}:${(diff%60).toString().padStart(2,'0')}`;
+  document.getElementById('td').textContent=`as ${fmts(nxt)}`;
+  document.getElementById('tb').classList.toggle('urgent',diff<=60);
+  if(diff<=5&&diff>0){
+    buildNotifBanner();
+    if(!rotTriggered){rotTriggered=true;sendPush();}
+  }else if(diff>60){
+    document.getElementById('nb').classList.remove('show');
+    rotTriggered=false;
+  }
+  if(diff===0)setTimeout(()=>{execRot();toast('Revezamento automatico!');},500);
+}
+
+function nmBadge(m){
+  if(m<=1)return['nm-e','ENTRA'];if(m===2)return['nm-2','2X'];
+  if(m===3)return['nm-3','3X'];if(m===4)return['nm-4','4X'];return['nm-5',m+'X'];
+}
+
+function buildNotifBanner(){
+  const plan=calcPlan();
+  const moves=plan.filter(p=>p.type==='move');
+  const rests=plan.filter(p=>p.type==='rest');
+  if(!moves.length)return;
+  document.getElementById('notif-moves').innerHTML=moves.map(m=>{
+    const[bc,bt]=nmBadge(m.mult);
+    return`<div class="notif-move"><span class="nm-name">${m.dname}</span><span class="nm-tbl">Mesa ${m.toNum}</span><span class="nm-badge ${bc}">${bt}</span></div>`;
+  }).join('');
+  document.getElementById('notif-rest').textContent=rests.length?'Descansam: '+rests.map(r=>r.dname).join(', '):'';
+  document.getElementById('nb').classList.add('show');
+}
+
+function sendPush(){
+  const plan=calcPlan();
+  const moves=plan.filter(p=>p.type==='move');
+  if(!moves.length)return;
+  const body=moves.map(m=>`${m.dname} -> Mesa ${m.toNum}`).join('\n');
+  try{if('Notification'in window&&Notification.permission==='granted')new Notification('Hora do Revezamento!',{body,icon:'icons/icon-192.png'});}catch(e){}
+}
+
+/* TABLES */
+function addTable(){
+  if(currentRole!=='floor')return;
+  const num=S.tables.length>0?Math.max(...S.tables.map(t=>t.num))+1:1;
+  S.tables.push({id:Date.now(),num,dealerId:null});
+  save();renderTables();recalc();toast(`Mesa ${num} aberta`);reqNotif();
+}
+function removeTable(id){
+  if(currentRole!=='floor')return;
+  const t=S.tables.find(x=>x.id===id);if(!t)return;
+  if(t.dealerId){const d=S.dealers.find(x=>x.id===t.dealerId);if(d){d.covCount=Math.max(0,(d.covCount||1)-1);if(d.covCount===0)d.tableId=null;}t.dealerId=null;}
+  S.tables=S.tables.filter(x=>x.id!==id);
+  save();renderTables();renderDealers();recalc();toast('Mesa fechada');
+}
+function editTableNum(id,val){
+  if(currentRole!=='floor')return;
+  const t=S.tables.find(x=>x.id===id);if(!t)return;
+  const n=parseInt(val);if(isNaN(n)||n<1)return;
+  t.num=n;save();renderTables();
+}
+function assignDealer(tableId,dealerId){
+  if(currentRole!=='floor')return;
+  const t=S.tables.find(x=>x.id===tableId);if(!t)return;
+  if(t.dealerId){const old=S.dealers.find(x=>x.id===t.dealerId);if(old){old.covCount=Math.max(0,(old.covCount||1)-1);if(old.covCount===0)old.tableId=null;}}
+  if(dealerId){const d=S.dealers.find(x=>x.id===parseInt(dealerId));if(d){d.covCount=(d.covCount||0)+1;d.tableId=tableId;t.dealerId=d.id;}else t.dealerId=null;}
+  else t.dealerId=null;
+  save();renderTables();renderDealers();
+}
+function renderTables(){
+  const g=document.getElementById('tg');
+  document.getElementById('tc').textContent=S.tables.length;
+  const isFloor=currentRole==='floor';
+  if(!S.tables.length){g.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--txm);font-size:11px;padding:20px">Nenhuma mesa aberta.</div>';return;}
+  g.innerHTML=S.tables.map(t=>{
+    const d=t.dealerId?S.dealers.find(x=>x.id===t.dealerId):null;
+    if(isFloor){
+      const opts=S.dealers.map(x=>`<option value="${x.id}" ${x.id===t.dealerId?'selected':''}>${x.name}${(x.covCount||0)>1?' ('+x.covCount+'x)':''}</option>`).join('');
+      return`<div class="tcard ${t.dealerId?'active':''}">
+        <div class="tnum"><span style="color:var(--txm);font-size:9px">MESA</span><input type="number" value="${t.num}" min="1" max="99" onchange="editTableNum(${t.id},this.value)"/></div>
+        <div class="dname ${!d?'empty':''}">${d?d.name:'Vaga'}</div>
+        <select onchange="assignDealer(${t.id},this.value)"><option value="">— sem dealer —</option>${opts}</select>
+        <button class="btn dng sm" style="width:100%" onclick="removeTable(${t.id})">Fechar Mesa</button>
+      </div>`;
+    }else{
+      const st=d?dealerStyle(d):null;
+      return`<div class="tcard ${t.dealerId?'active':''}">
+        <div class="tnum"><span style="color:var(--txm);font-size:9px">MESA</span><span style="font-size:14px;color:var(--gold);font-weight:bold;margin-left:3px">${t.num}</span></div>
+        <div class="dname ${!d?'empty':''}">${d?d.name:'Vaga'}</div>
+        ${d&&st?`<span class="dst ${st.cls}" style="display:inline-block;margin-top:3px">${st.lbl}</span>`:''}
+      </div>`;
+    }
+  }).join('');
+}
+
+/* DEALERS */
+function addDealer(){
+  if(currentRole!=='floor')return;
+  const ni=document.getElementById('dni'),ti=document.getElementById('dti');
+  const name=ni.value.trim();if(!name){toast('Digite o nome do dealer');return;}
+  const t=ti.value||now().toTimeString().slice(0,5);
+  S.dealers.push({id:Date.now(),name,startTime:parseT(t).getTime(),color:COLORS[S.dealers.length%COLORS.length],covCount:0,tableId:null});
+  ni.value='';ti.value='';
+  save();renderDealers();toast(`${name} adicionado`);
+}
+function removeDealer(id){
+  if(currentRole!=='floor')return;
+  const d=S.dealers.find(x=>x.id===id);
+  if(d&&d.tableId){const t=S.tables.find(x=>x.id===d.tableId);if(t)t.dealerId=null;}
+  S.dealers=S.dealers.filter(x=>x.id!==id);
+  save();renderDealers();renderTables();recalc();
+}
+function renderDealers(){
+  const l=document.getElementById('dl');
+  document.getElementById('dc').textContent=S.dealers.length;
+  const isFloor=currentRole==='floor';
+  if(!S.dealers.length){l.innerHTML='<div style="text-align:center;color:var(--txm);font-size:11px;padding:20px">Nenhum dealer adicionado.</div>';return;}
+  l.innerHTML=S.dealers.map(d=>{
+    const av=isAvailable(d);
+    const mins=av?Math.floor((now()-new Date(d.startTime))/60000):0;
+    const onT=S.tables.filter(t=>t.dealerId===d.id);
+    const loc=av?(onT.length>0?`Mesa ${onT.map(t=>t.num).join('+')}`:' Descansando'):`Entra as ${fmts(new Date(d.startTime))}`;
+    const st=dealerStyle(d);
+    const frt=!av?firstRotTime(d):null;
+    const rmBtn=isFloor?`<button class="btn dng sm" onclick="removeDealer(${d.id})" style="margin-left:4px;padding:4px 7px">x</button>`:'';
+    return`<div class="ditem ${itemCls(d)}">
+      <div class="dav" style="background:${d.color}22;border:1px solid ${d.color};color:${d.color}">${initials(d.name)}</div>
+      <div class="dinf"><div class="nm">${d.name}</div><div class="mt">${loc}${av?` · ${fmtDur(mins)}`:frt?` · Rev ${fmts(frt)}`:''}</div></div>
+      <span class="dst ${st.cls}">${st.lbl}</span>${rmBtn}
+    </div>`;
+  }).join('');
+}
+
+/* ROTATION */
+function calcPlan(){
+  const tables=S.tables.slice().sort((a,b)=>a.num-b.num);
+  const dealers=S.dealers;
+  if(!tables.length||!dealers.length)return[];
+  const available=dealers.filter(d=>isAvailableAtNextRot(d));
+  const notYet=dealers.filter(d=>!isAvailableAtNextRot(d));
+  const onBreak=available.filter(d=>!(d.covCount>0));
+  const onTable=available.filter(d=>d.covCount>0);
+  const tCount=tables.length;
+  const plan=[];
+  if(!available.length){notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'info',msg:`${d.name} disponivel as ${fmts(frt)}`});});return plan;}
+  const sortedOnTable=onTable.slice().sort((a,b)=>(a.covCount||0)-(b.covCount||0));
+  const incoming=[];
+  onBreak.forEach(d=>{if(incoming.length<tCount)incoming.push(d);});
+  if(incoming.length<tCount)for(let i=0;i<sortedOnTable.length&&incoming.length<tCount;i++)incoming.push(sortedOnTable[i]);
+  const incomingIds=new Set(incoming.map(d=>d.id));
+  const restSet=new Set();
+  onTable.filter(d=>!incomingIds.has(d.id)).forEach(d=>restSet.add(d.id));
+  const moves=[],rests=[];
+  tables.forEach((t,i)=>{
+    const d=incoming[i];if(!d)return;
+    const nextMult=(d.covCount||0)+1;
+    let mlabel='ml-normal';
+    if(nextMult===2)mlabel='ml-2x';else if(nextMult===3)mlabel='ml-3x';
+    else if(nextMult===4)mlabel='ml-4x';else if(nextMult>=5)mlabel='ml-5x';
+    const curD=t.dealerId?dealers.find(x=>x.id===t.dealerId):null;
+    if(curD&&curD.id!==d.id&&!restSet.has(curD.id))restSet.add(curD.id);
+    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult:nextMult,mlabel});
+  });
+  restSet.forEach(id=>{if(incomingIds.has(id))return;const d=dealers.find(x=>x.id===id);if(!d)return;rests.push({type:'rest',dname:d.name,did:id,msg:`era ${d.covCount}x`});});
+  moves.forEach(m=>plan.push(m));rests.forEach(r=>plan.push(r));
+  notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'pending',dname:d.name,did:d.id,msg:`Entra no rev. as ${fmts(frt)}`});});
+  if(available.length<tCount)plan.push({type:'warn',msg:`${tCount-available.length} mesa(s) sem cobertura. Cascade ativo — ate ${Math.ceil(tCount/Math.max(1,available.length))}x por dealer.`});
+  return plan;
+}
+
+function multLabel(m){
+  if(m<=1)return{text:'ENTRA',cls:'ml-normal'};if(m===2)return{text:'2X',cls:'ml-2x'};
+  if(m===3)return{text:'3X',cls:'ml-3x'};if(m===4)return{text:'4X',cls:'ml-4x'};return{text:m+'X',cls:'ml-5x'};
+}
+
+function renderRotPlan(plan){
+  const box=document.getElementById('rpb');
+  if(!plan||!plan.length){box.innerHTML='<div style="background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px;text-align:center;color:var(--txm);font-size:11px">Adicione mesas e dealers para ver o plano.</div>';return;}
+  const moves=plan.filter(p=>p.type==='move');
+  const rests=plan.filter(p=>p.type==='rest');
+  const pendings=plan.filter(p=>p.type==='pending');
+  const warns=plan.filter(p=>p.type==='warn');
+  const infos=plan.filter(p=>p.type==='info');
+  let html='<div class="rplan"><div class="rttl">Movimentos no proximo revezamento:</div>';
+  if(infos.length)infos.forEach(i=>{html+=`<div class="mitem"><span class="marr" style="color:#aaa">i</span><span style="color:#aaa;font-size:11px">${i.msg}</span></div>`;});
+  if(moves.length){
+    html+='<div class="rsub">ENTRAM NAS MESAS:</div>';
+    moves.forEach(m=>{const ml=multLabel(m.mult);html+=`<div class="mitem"><span class="marr">&#8594;</span><div style="flex:1"><span class="mname">${m.dname}</span><span style="color:var(--txm);font-size:10px"> Mesa ${m.toNum}</span><span class="mlabel ${ml.cls}">${ml.text}</span></div></div>`;});
+  }
+  if(rests.length){
+    html+='<div class="rsub">SAEM PARA DESCANSAR:</div>';
+    rests.forEach(r=>{html+=`<div class="mitem"><span class="marr" style="color:#7fc8f8">&#8595;</span><div style="flex:1"><span class="mname">${r.dname}</span><span class="mlabel ml-rest">DESCANSO</span><div style="font-size:9px;color:#ff8a7a;margin-top:2px">Vai descansar (${r.msg})</div></div></div>`;});
+  }
+  if(pendings.length){
+    html+='<div class="rsub">AGUARDANDO HORARIO:</div>';
+    pendings.forEach(p=>{html+=`<div class="mitem"><span class="marr" style="color:#aaa">&#8987;</span><div style="flex:1"><span class="mname" style="color:#aaa">${p.dname}</span><div style="font-size:9px;color:#888;margin-top:2px">${p.msg}</div></div></div>`;});
+  }
+  html+='</div>';
+  if(warns.length)warns.forEach(w=>{html+=`<div style="background:rgba(192,57,43,.12);border:1px solid rgba(192,57,43,.4);border-radius:8px;padding:9px 11px;margin-top:8px;font-size:11px;color:#ff8a7a">${w.msg}</div>`;});
+  box.innerHTML=html;
+}
+
+function recalc(){renderRotPlan(calcPlan())}
+
+function execRot(){
+  if(currentRole!=='floor')return;
+  const plan=calcPlan();
+  const moves=plan.filter(p=>p.type==='move');
+  const rests=plan.filter(p=>p.type==='rest');
+  const restIds=new Set(rests.map(r=>r.did));
+  const moveIds=new Set(moves.map(m=>m.did));
+  rests.forEach(r=>{if(moveIds.has(r.did))return;const d=S.dealers.find(x=>x.id===r.did);if(d){d.covCount=0;d.tableId=null;}});
+  moves.forEach(m=>{
+    const t=S.tables.find(x=>x.id===m.toTable);if(!t)return;
+    if(t.dealerId&&t.dealerId!==m.did&&!restIds.has(t.dealerId)){const old=S.dealers.find(x=>x.id===t.dealerId);if(old){old.covCount=Math.max(0,(old.covCount||1)-1);if(old.covCount===0)old.tableId=null;}}
+    const d=S.dealers.find(x=>x.id===m.did);if(d){d.covCount=m.mult;d.tableId=m.toTable;t.dealerId=d.id;}
+  });
+  S.tables.forEach(t=>{if(t.dealerId&&!S.dealers.find(d=>d.id===t.dealerId))t.dealerId=null;});
+  S.rotCount++;S.lastRot=Date.now();
+  save();renderTables();renderDealers();recalc();toast('Revezamento executado!');
+}
+
+function renderReport(){
+  const l=document.getElementById('sl');
+  if(!S.dealers.length){l.innerHTML='<div style="text-align:center;color:var(--txm);font-size:11px;padding:20px">Nenhum dealer registrado.</div>';return;}
+  const sorted=[...S.dealers].sort((a,b)=>{
+    const ma=isAvailable(a)?Math.floor((now()-new Date(a.startTime))/60000):0;
+    const mb=isAvailable(b)?Math.floor((now()-new Date(b.startTime))/60000):0;return mb-ma;
+  });
+  l.innerHTML=sorted.map(d=>{
+    const av=isAvailable(d);
+    const totalMins=av?Math.floor((now()-new Date(d.startTime))/60000):0;
+    const h=Math.floor(totalMins/60),m=totalMins%60;
+    const onT=S.tables.filter(t=>t.dealerId===d.id);
+    const st=dealerStyle(d);
+    return`<div class="sitem">
+      <div style="display:flex;align-items:center;gap:9px">
+        <div class="dav" style="width:32px;height:32px;font-size:10px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;background:${d.color}22;border:1px solid ${d.color};color:${d.color}">${initials(d.name)}</div>
+        <div>
+          <div style="font-size:13px;font-weight:bold">${d.name}</div>
+          <div style="font-size:10px;color:var(--txm)">${av?`Entrou: ${fmts(new Date(d.startTime))}`:`Entra: ${fmts(new Date(d.startTime))}`} · <span class="dst ${st.cls}" style="display:inline-block">${st.lbl}</span></div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:17px;color:var(--gold);font-weight:bold;font-family:'Courier New',monospace">${av?`${h}h${m.toString().padStart(2,'0')}m`:'--'}</div>
+        <div style="font-size:10px;color:var(--txm)">${onT.length?'Mesa '+onT.map(t=>t.num).join('+'):(av?'Fora':'Pendente')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetDay(){
+  if(currentRole!=='floor')return;
+  if(!confirm('Encerrar o dia e apagar todos os dados?'))return;
+  S={tables:[],dealers:[],rotCount:0,lastRot:null};
+  save();renderTables();renderDealers();recalc();renderReport();
+  toast('Dia encerrado. Dados zerados.');
+}
+
+function showTab(name){
+  ['mesas','dealers','rotacao','relatorio'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===name?'':'none';});
+  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['mesas','dealers','rotacao','relatorio'][i]===name);});
+  if(name==='rotacao')recalc();if(name==='relatorio')renderReport();
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function reqNotif(){if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();}
+
+window.addEventListener('online',()=>document.getElementById('offbar').classList.remove('show'));
+window.addEventListener('offline',()=>document.getElementById('offbar').classList.add('show'));
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+function startApp(){
+  load();
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  applyRoleUI();
+  const ti=document.getElementById('dti');if(ti)ti.value=now().toTimeString().slice(0,5);
+  renderTables();renderDealers();recalc();renderReport();
+  if(!window._clockStarted){
+    window._clockStarted=true;
+    updateClock();
+    setInterval(updateClock,1000);
+    setInterval(()=>{if(document.getElementById('app').style.display!=='none'){renderDealers();if(document.getElementById('tab-relatorio').style.display!=='none')renderReport();}},30000);
+  }
+  reqNotif();
+  if(!navigator.onLine)document.getElementById('offbar').classList.add('show');
+}
+
+/* Auto-login via sessionStorage */
+(function(){
+  try{const sess=sessionStorage.getItem('pdr_sess');if(sess){const{u,role}=JSON.parse(sess);if(USERS[u]){currentUser=u;currentRole=role;startApp();return;}}}catch(e){}
+})();
+</script>
+</body>
+</html>
