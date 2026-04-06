@@ -621,9 +621,8 @@ document.addEventListener('visibilitychange', () => {
   if(document.getElementById('app').style.display === 'none') return;
   const before = JSON.stringify(S);
   load();
-  if(JSON.stringify(S) !== before) {
-    refreshAll();
-  }
+  if(JSON.stringify(S) !== before) refreshAll();
+  catchUpMissedRotations();
 });
 
 function refreshAll(){
@@ -636,12 +635,71 @@ function refreshAll(){
   if(activeTab === 'relatorio') renderReport();
 }
 
+/* ── Executa revezamentos que foram perdidos enquanto a página estava em segundo plano ── */
+function catchUpMissedRotations(){
+  const n = now();
+  const lastRot = S.lastRot ? new Date(S.lastRot) : null;
+
+  /* coleta todos os horários de revezamento das últimas 2h que já passaram */
+  const missed = [];
+  for(let h = n.getHours() - 2; h <= n.getHours(); h++){
+    for(const m of [23, 53]){
+      const t = new Date(n);
+      t.setHours(h, m, 0, 0);
+      /* passou, mas ocorreu depois do último revezamento registrado (ou nunca houve) */
+      if(t < n && (!lastRot || t > lastRot)){
+        missed.push(t);
+      }
+    }
+  }
+
+  if(missed.length === 0) return;
+
+  /* ordena cronologicamente e executa cada um */
+  missed.sort((a,b) => a - b);
+  missed.forEach(() => execRotSilent());
+
+  const count = missed.length;
+  toast(`${count} revezamento${count>1?'s':''} executado${count>1?'s':''} automaticamente`);
+  sendPush();
+}
+
+/* igual ao execRot mas sem verificar perfil e sem toast (chamado internamente) */
+function execRotSilent(){
+  const plan = calcPlan();
+  const moves = plan.filter(p => p.type === 'move');
+  const rests = plan.filter(p => p.type === 'rest');
+  if(!moves.length) return;
+  const restIds = new Set(rests.map(r => r.did));
+  const moveIds = new Set(moves.map(m => m.did));
+  rests.forEach(r => {
+    if(moveIds.has(r.did)) return;
+    const d = S.dealers.find(x => x.id === r.did);
+    if(d){ d.covCount = 0; d.tableId = null; }
+  });
+  moves.forEach(m => {
+    const t = S.tables.find(x => x.id === m.toTable); if(!t) return;
+    if(t.dealerId && t.dealerId !== m.did && !restIds.has(t.dealerId)){
+      const old = S.dealers.find(x => x.id === t.dealerId);
+      if(old){ old.covCount = Math.max(0,(old.covCount||1)-1); if(old.covCount===0) old.tableId=null; }
+    }
+    const d = S.dealers.find(x => x.id === m.did);
+    if(d){ d.covCount = m.mult; d.tableId = m.toTable; t.dealerId = d.id; }
+  });
+  S.tables.forEach(t => { if(t.dealerId && !S.dealers.find(d => d.id === t.dealerId)) t.dealerId = null; });
+  S.rotCount++;
+  S.lastRot = Date.now();
+  save();
+  refreshAll();
+}
+
 function startApp(){
   load();
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
   applyRoleUI();
   const ti=document.getElementById('dti');if(ti)ti.value=now().toTimeString().slice(0,5);
+  catchUpMissedRotations();
   renderTables();renderDealers();recalc();renderReport();
   if(!window._clockStarted){
     window._clockStarted=true;
