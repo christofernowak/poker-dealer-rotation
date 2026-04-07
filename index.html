@@ -407,7 +407,14 @@ function startRealtimeSync(){
         S={tables:[],dealers:[],rotCount:0,lastRot:null};
         refreshAll();return;
       }
-      S=snap.val();
+      const raw=snap.val();
+      /* Realtime Database converte arrays em objetos — converte de volta */
+      S={
+        tables: raw.tables ? Object.values(raw.tables) : [],
+        dealers: raw.dealers ? Object.values(raw.dealers) : [],
+        rotCount: raw.rotCount||0,
+        lastRot: raw.lastRot||null
+      };
       catchUpMissedRotations();
       refreshAll();
     },
