@@ -22,8 +22,23 @@
 }
 html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,serif;overscroll-behavior:none}
 
+/* FIREBASE CONFIG SCREEN */
+#cfg-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)}
+.cfg-card{width:100%;max-width:400px;background:var(--cb);border:1px solid rgba(201,168,76,.4);border-radius:14px;padding:20px}
+.cfg-title{font-size:16px;color:var(--gold);font-weight:bold;margin-bottom:4px;text-align:center}
+.cfg-sub{font-size:11px;color:var(--txm);margin-bottom:16px;text-align:center;line-height:1.6}
+.cfg-card label{display:block;font-size:10px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;margin-top:10px}
+.cfg-card input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:6px;padding:8px 10px;color:var(--tx);font-family:'Courier New',monospace;font-size:11px;margin-bottom:2px;-webkit-appearance:none}
+.cfg-card input:focus{outline:none;border-color:var(--gold)}
+.cfg-btn{width:100%;padding:11px;background:var(--gold);color:#0a1f10;border:none;border-radius:7px;font-size:14px;font-weight:bold;font-family:inherit;cursor:pointer;margin-top:14px}
+.cfg-btn:active{background:var(--goldf)}
+.cfg-err{background:rgba(192,57,43,.2);border:1px solid rgba(192,57,43,.5);border-radius:6px;padding:8px 10px;font-size:11px;color:#ff8a7a;text-align:center;margin-top:10px;display:none}
+.cfg-err.show{display:block}
+.cfg-steps{background:rgba(0,0,0,.3);border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:var(--txm);line-height:1.8}
+.cfg-steps b{color:var(--gold)}
+
 /* LOGIN */
-#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:var(--bg)}
+#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:var(--bg);display:none}
 .login-logo{font-size:52px;margin-bottom:6px;text-align:center}
 .login-title{font-size:22px;color:var(--gold);letter-spacing:3px;font-weight:bold;text-align:center;margin-bottom:4px}
 .login-sub{font-size:12px;color:var(--txm);margin-bottom:32px;text-align:center}
@@ -46,7 +61,13 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 .role-floor{background:rgba(201,168,76,.2);color:var(--gold);border:1px solid rgba(201,168,76,.4)}
 .role-dealer{background:rgba(41,128,185,.2);color:#7fc8f8;border:1px solid rgba(41,128,185,.4)}
 .logout-btn{background:transparent;border:1px solid rgba(201,168,76,.25);color:var(--txm);font-size:10px;cursor:pointer;padding:4px 8px;font-family:inherit;border-radius:5px;flex-shrink:0}
-.logout-btn:active{color:var(--tx)}
+
+/* sync indicator */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#555;display:inline-block;margin-left:4px;vertical-align:middle;flex-shrink:0}
+.sync-dot.ok{background:#27ae60}
+.sync-dot.syncing{background:var(--gold);animation:pulse 1s infinite}
+.sync-dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 .timer-box{background:var(--cb);border:1px solid var(--gold);border-radius:var(--r);padding:12px 16px;margin:10px;text-align:center}
 .timer-box.urgent{border-color:var(--red);animation:pb 1s infinite}
@@ -56,7 +77,6 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 .lbl{font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:1px}
 .tdsp{font-size:12px;color:var(--txm);margin-top:2px}
 
-/* Notificação — visível para todos */
 .notif{background:#3a0e0e;border:2px solid var(--red);border-radius:var(--r);padding:14px 14px 10px;margin:10px;display:none}
 .notif.show{display:block}
 .notif-title{font-size:14px;color:#ff8a7a;font-weight:bold;text-align:center;letter-spacing:1px;margin-bottom:10px}
@@ -144,7 +164,33 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 </style>
 </head>
 <body>
-<div class="offline-bar" id="offbar">Modo offline — dados salvos localmente</div>
+<div class="offline-bar" id="offbar">Sem conexao — aguardando...</div>
+
+<!-- FIREBASE CONFIG -->
+<div id="cfg-screen">
+  <div class="cfg-card">
+    <div class="cfg-title">♠ Configuracao Firebase</div>
+    <div class="cfg-sub">Necessario apenas na primeira vez.<br>Os dados ficam salvos no seu dispositivo.</div>
+    <div class="cfg-steps">
+      <b>Como obter as credenciais:</b><br>
+      1. Acesse <b>console.firebase.google.com</b><br>
+      2. Crie um projeto (gratis)<br>
+      3. Ative o <b>Firestore Database</b> em modo producao<br>
+      4. Va em <b>Configuracoes do projeto &gt; Seus apps &gt; Web</b><br>
+      5. Copie os valores do <b>firebaseConfig</b> abaixo<br>
+      6. No Firestore, va em <b>Regras</b> e cole:<br>
+      <span style="font-family:monospace;font-size:10px;color:#aaa">allow read, write: if true;</span>
+    </div>
+    <label>API Key</label>
+    <input type="text" id="fb-apikey" placeholder="AIzaSy..."/>
+    <label>Auth Domain</label>
+    <input type="text" id="fb-authdomain" placeholder="meu-projeto.firebaseapp.com"/>
+    <label>Project ID</label>
+    <input type="text" id="fb-projectid" placeholder="meu-projeto"/>
+    <button class="cfg-btn" onclick="saveFirebaseConfig()">CONECTAR E SALVAR</button>
+    <div class="cfg-err" id="cfg-err">Erro ao conectar. Verifique as credenciais.</div>
+  </div>
+</div>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -169,10 +215,10 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
       <h1>♠ DEALER ROTATION ♦</h1>
       <p id="ct"></p>
     </div>
+    <span class="sync-dot" id="sync-dot" title="Status da conexao"></span>
     <button class="logout-btn" onclick="doLogout()">Sair</button>
   </div>
 
-  <!-- Notificacao visivel para TODOS os perfis -->
   <div class="notif" id="nb">
     <div class="notif-title">♠ HORA DO REVEZAMENTO! ♦</div>
     <div class="notif-moves" id="notif-moves"></div>
@@ -208,7 +254,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
   <div id="tab-dealers" style="display:none">
     <div class="sec" style="margin-top:10px">
       <div class="sec-hdr"><span class="sec-ttl">Dealers</span><span class="badge" id="dc">0</span></div>
-      <div class="aform floor-only" id="dealer-add-form" style="margin-bottom:9px">
+      <div class="aform floor-only" style="margin-bottom:9px">
         <input type="text" id="dni" placeholder="Nome do dealer..." maxlength="24" autocomplete="off"/>
         <div class="arow">
           <label>Entrada:</label>
@@ -225,7 +271,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
       <div class="sec-hdr"><span class="sec-ttl">Plano de Rotacao</span><button class="btn sm" onclick="recalc()">Recalcular</button></div>
       <div id="rpb"></div>
     </div>
-    <div class="sec floor-only" id="exec-rot-sec">
+    <div class="sec floor-only">
       <div style="background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:var(--r);padding:11px;text-align:center">
         <p style="font-size:11px;color:var(--txm);margin-bottom:9px">Aplicar rotacao planejada agora</p>
         <button class="btn pri" onclick="execRot()" style="width:100%;padding:12px;font-size:14px">EXECUTAR REVEZAMENTO AGORA</button>
@@ -244,15 +290,63 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
         <button class="btn dng" onclick="resetDay()" style="width:100%;padding:10px">ENCERRAR DIA</button>
       </div>
     </div>
+    <div class="sec floor-only">
+      <div style="background:var(--cb);border:1px solid rgba(80,80,80,.3);border-radius:var(--r);padding:11px;text-align:center">
+        <p style="font-size:11px;color:var(--txm);margin-bottom:9px">Reconfigurar credenciais do Firebase</p>
+        <button class="btn sm" onclick="resetFirebaseConfig()" style="width:100%">Reconfigurar Firebase</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
 const USERS={'floor01':{pass:'123456',role:'floor'},'dealer':{pass:'123',role:'dealer'}};
 let currentUser=null,currentRole=null;
+let db=null,unsubscribe=null;
 
+/* ── FIREBASE CONFIG ── */
+function loadFirebaseConfig(){
+  try{const c=localStorage.getItem('pdr_fbcfg');return c?JSON.parse(c):null;}catch(e){return null;}
+}
+function saveFirebaseConfig(){
+  const apiKey=document.getElementById('fb-apikey').value.trim();
+  const authDomain=document.getElementById('fb-authdomain').value.trim();
+  const projectId=document.getElementById('fb-projectid').value.trim();
+  if(!apiKey||!authDomain||!projectId){
+    showCfgErr('Preencha todos os campos');return;
+  }
+  const cfg={apiKey,authDomain,projectId};
+  try{
+    initFirebase(cfg);
+    localStorage.setItem('pdr_fbcfg',JSON.stringify(cfg));
+    document.getElementById('cfg-screen').style.display='none';
+    document.getElementById('login-screen').style.display='flex';
+  }catch(e){showCfgErr('Erro: '+e.message);}
+}
+function showCfgErr(msg){
+  const el=document.getElementById('cfg-err');el.textContent=msg;el.classList.add('show');
+}
+function resetFirebaseConfig(){
+  if(!confirm('Reconfigurar o Firebase? Voce precisara inserir as credenciais novamente.'))return;
+  localStorage.removeItem('pdr_fbcfg');
+  doLogout();
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('cfg-screen').style.display='flex';
+}
+function initFirebase(cfg){
+  if(firebase.apps.length)firebase.app().delete();
+  firebase.initializeApp(cfg);
+  db=firebase.firestore();
+  db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+}
+
+/* ── LOGIN ── */
 function doLogin(){
   const u=document.getElementById('l-user').value.trim().toLowerCase();
   const p=document.getElementById('l-pass').value;
@@ -267,12 +361,11 @@ function doLogin(){
     document.getElementById('l-pass').value='';
   }
 }
-
 document.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();
+  if(e.key==='Enter'&&document.getElementById('login-screen').style.display==='flex')doLogin();
 });
-
 function doLogout(){
+  if(unsubscribe){unsubscribe();unsubscribe=null;}
   currentUser=null;currentRole=null;
   try{sessionStorage.removeItem('pdr_sess')}catch(e){}
   document.getElementById('app').style.display='none';
@@ -280,7 +373,6 @@ function doLogout(){
   document.getElementById('l-user').value='';
   document.getElementById('l-pass').value='';
 }
-
 function applyRoleUI(){
   const isFloor=currentRole==='floor';
   document.querySelectorAll('.floor-only').forEach(el=>{el.style.display=isFloor?'':'none'});
@@ -289,11 +381,40 @@ function applyRoleUI(){
   rb.className='role-badge '+(isFloor?'role-floor':'role-dealer');
 }
 
-/* STATE */
+/* ── STATE ── */
 const COLORS=['#c9a84c','#2980b9','#27ae60','#8e44ad','#e67e22','#e74c3c','#1abc9c','#d35400','#16a085','#f39c12','#3498db','#e91e63'];
 let S={tables:[],dealers:[],rotCount:0,lastRot:null};
-function save(){try{localStorage.setItem('pdr_pwa',JSON.stringify(S))}catch(e){}}
-function load(){try{const s=localStorage.getItem('pdr_pwa');if(s)S=JSON.parse(s)}catch(e){}}
+
+/* Salva no Firestore — unico documento 'state' na colecao 'tournament' */
+function save(){
+  if(!db)return;
+  setSyncStatus('syncing');
+  db.collection('tournament').doc('state').set(S)
+    .then(()=>setSyncStatus('ok'))
+    .catch(()=>setSyncStatus('err'));
+}
+
+function setSyncStatus(status){
+  const dot=document.getElementById('sync-dot');
+  if(dot)dot.className='sync-dot '+status;
+}
+
+/* Inicia listener em tempo real — quando qualquer dispositivo salva, todos recebem */
+function startRealtimeSync(){
+  if(unsubscribe)unsubscribe();
+  setSyncStatus('syncing');
+  unsubscribe=db.collection('tournament').doc('state').onSnapshot(
+    snap=>{
+      setSyncStatus('ok');
+      if(!snap.exists){S={tables:[],dealers:[],rotCount:0,lastRot:null};refreshAll();return;}
+      const remote=snap.data();
+      S=remote;
+      catchUpMissedRotations();
+      refreshAll();
+    },
+    err=>{setSyncStatus('err');console.error(err);}
+  );
+}
 
 const now=()=>new Date();
 const fmt=d=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -330,7 +451,7 @@ function itemCls(d){
   if(c===2)return'on-double';if(c===3)return'on-triple';return'on-more';
 }
 
-/* CLOCK */
+/* ── CLOCK ── */
 let rotTriggered=false;
 function updateClock(){
   const n=now();
@@ -344,17 +465,15 @@ function updateClock(){
     buildNotifBanner();
     if(!rotTriggered){rotTriggered=true;sendPush();}
   }else if(diff>60){
-    document.getElementById('nb').classList.remove('show');
-    rotTriggered=false;
+    document.getElementById('nb').classList.remove('show');rotTriggered=false;
   }
-  if(diff===0)setTimeout(()=>{execRot();toast('Revezamento automatico!');},500);
+  if(diff===0)setTimeout(()=>{execRotSilent();toast('Revezamento automatico!');},500);
 }
 
 function nmBadge(m){
   if(m<=1)return['nm-e','ENTRA'];if(m===2)return['nm-2','2X'];
   if(m===3)return['nm-3','3X'];if(m===4)return['nm-4','4X'];return['nm-5',m+'X'];
 }
-
 function buildNotifBanner(){
   const plan=calcPlan();
   const moves=plan.filter(p=>p.type==='move');
@@ -367,16 +486,13 @@ function buildNotifBanner(){
   document.getElementById('notif-rest').textContent=rests.length?'Descansam: '+rests.map(r=>r.dname).join(', '):'';
   document.getElementById('nb').classList.add('show');
 }
-
 function sendPush(){
-  const plan=calcPlan();
-  const moves=plan.filter(p=>p.type==='move');
-  if(!moves.length)return;
+  const plan=calcPlan();const moves=plan.filter(p=>p.type==='move');if(!moves.length)return;
   const body=moves.map(m=>`${m.dname} -> Mesa ${m.toNum}`).join('\n');
   try{if('Notification'in window&&Notification.permission==='granted')new Notification('Hora do Revezamento!',{body,icon:'icons/icon-192.png'});}catch(e){}
 }
 
-/* TABLES */
+/* ── TABLES ── */
 function addTable(){
   if(currentRole!=='floor')return;
   const num=S.tables.length>0?Math.max(...S.tables.map(t=>t.num))+1:1;
@@ -430,7 +546,7 @@ function renderTables(){
   }).join('');
 }
 
-/* DEALERS */
+/* ── DEALERS ── */
 function addDealer(){
   if(currentRole!=='floor')return;
   const ni=document.getElementById('dni'),ti=document.getElementById('dti');
@@ -457,8 +573,7 @@ function renderDealers(){
     const mins=av?Math.floor((now()-new Date(d.startTime))/60000):0;
     const onT=S.tables.filter(t=>t.dealerId===d.id);
     const loc=av?(onT.length>0?`Mesa ${onT.map(t=>t.num).join('+')}`:' Descansando'):`Entra as ${fmts(new Date(d.startTime))}`;
-    const st=dealerStyle(d);
-    const frt=!av?firstRotTime(d):null;
+    const st=dealerStyle(d);const frt=!av?firstRotTime(d):null;
     const rmBtn=isFloor?`<button class="btn dng sm" onclick="removeDealer(${d.id})" style="margin-left:4px;padding:4px 7px">x</button>`:'';
     return`<div class="ditem ${itemCls(d)}">
       <div class="dav" style="background:${d.color}22;border:1px solid ${d.color};color:${d.color}">${initials(d.name)}</div>
@@ -468,7 +583,7 @@ function renderDealers(){
   }).join('');
 }
 
-/* ROTATION */
+/* ── ROTATION ── */
 function calcPlan(){
   const tables=S.tables.slice().sort((a,b)=>a.num-b.num);
   const dealers=S.dealers;
@@ -477,8 +592,7 @@ function calcPlan(){
   const notYet=dealers.filter(d=>!isAvailableAtNextRot(d));
   const onBreak=available.filter(d=>!(d.covCount>0));
   const onTable=available.filter(d=>d.covCount>0);
-  const tCount=tables.length;
-  const plan=[];
+  const tCount=tables.length;const plan=[];
   if(!available.length){notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'info',msg:`${d.name} disponivel as ${fmts(frt)}`});});return plan;}
   const sortedOnTable=onTable.slice().sort((a,b)=>(a.covCount||0)-(b.covCount||0));
   const incoming=[];
@@ -504,12 +618,10 @@ function calcPlan(){
   if(available.length<tCount)plan.push({type:'warn',msg:`${tCount-available.length} mesa(s) sem cobertura. Cascade ativo — ate ${Math.ceil(tCount/Math.max(1,available.length))}x por dealer.`});
   return plan;
 }
-
 function multLabel(m){
   if(m<=1)return{text:'ENTRA',cls:'ml-normal'};if(m===2)return{text:'2X',cls:'ml-2x'};
   if(m===3)return{text:'3X',cls:'ml-3x'};if(m===4)return{text:'4X',cls:'ml-4x'};return{text:m+'X',cls:'ml-5x'};
 }
-
 function renderRotPlan(plan){
   const box=document.getElementById('rpb');
   if(!plan||!plan.length){box.innerHTML='<div style="background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px;text-align:center;color:var(--txm);font-size:11px">Adicione mesas e dealers para ver o plano.</div>';return;}
@@ -536,14 +648,18 @@ function renderRotPlan(plan){
   if(warns.length)warns.forEach(w=>{html+=`<div style="background:rgba(192,57,43,.12);border:1px solid rgba(192,57,43,.4);border-radius:8px;padding:9px 11px;margin-top:8px;font-size:11px;color:#ff8a7a">${w.msg}</div>`;});
   box.innerHTML=html;
 }
-
 function recalc(){renderRotPlan(calcPlan())}
 
 function execRot(){
   if(currentRole!=='floor')return;
+  execRotSilent();
+  toast('Revezamento executado!');
+}
+function execRotSilent(){
   const plan=calcPlan();
   const moves=plan.filter(p=>p.type==='move');
   const rests=plan.filter(p=>p.type==='rest');
+  if(!moves.length)return;
   const restIds=new Set(rests.map(r=>r.did));
   const moveIds=new Set(moves.map(m=>m.did));
   rests.forEach(r=>{if(moveIds.has(r.did))return;const d=S.dealers.find(x=>x.id===r.did);if(d){d.covCount=0;d.tableId=null;}});
@@ -554,7 +670,25 @@ function execRot(){
   });
   S.tables.forEach(t=>{if(t.dealerId&&!S.dealers.find(d=>d.id===t.dealerId))t.dealerId=null;});
   S.rotCount++;S.lastRot=Date.now();
-  save();renderTables();renderDealers();recalc();toast('Revezamento executado!');
+  save();
+}
+
+function catchUpMissedRotations(){
+  const n=now();
+  const lastRot=S.lastRot?new Date(S.lastRot):null;
+  const missed=[];
+  for(let h=n.getHours()-2;h<=n.getHours();h++){
+    for(const m of[23,53]){
+      const t=new Date(n);t.setHours(h,m,0,0);
+      if(t<n&&(!lastRot||t>lastRot))missed.push(t);
+    }
+  }
+  if(!missed.length)return;
+  missed.sort((a,b)=>a-b);
+  missed.forEach(()=>execRotSilent());
+  const count=missed.length;
+  toast(`${count} revezamento${count>1?'s':''} executado${count>1?'s':''} automaticamente`);
+  sendPush();
 }
 
 function renderReport(){
@@ -568,8 +702,7 @@ function renderReport(){
     const av=isAvailable(d);
     const totalMins=av?Math.floor((now()-new Date(d.startTime))/60000):0;
     const h=Math.floor(totalMins/60),m=totalMins%60;
-    const onT=S.tables.filter(t=>t.dealerId===d.id);
-    const st=dealerStyle(d);
+    const onT=S.tables.filter(t=>t.dealerId===d.id);const st=dealerStyle(d);
     return`<div class="sitem">
       <div style="display:flex;align-items:center;gap:9px">
         <div class="dav" style="width:32px;height:32px;font-size:10px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;background:${d.color}22;border:1px solid ${d.color};color:${d.color}">${initials(d.name)}</div>
@@ -590,8 +723,13 @@ function resetDay(){
   if(currentRole!=='floor')return;
   if(!confirm('Encerrar o dia e apagar todos os dados?'))return;
   S={tables:[],dealers:[],rotCount:0,lastRot:null};
-  save();renderTables();renderDealers();recalc();renderReport();
-  toast('Dia encerrado. Dados zerados.');
+  save();refreshAll();toast('Dia encerrado. Dados zerados.');
+}
+
+function refreshAll(){
+  renderTables();renderDealers();recalc();
+  const activeTab=['mesas','dealers','rotacao','relatorio'].find(t=>document.getElementById('tab-'+t).style.display!=='none');
+  if(activeTab==='relatorio')renderReport();
 }
 
 function showTab(name){
@@ -604,124 +742,47 @@ function reqNotif(){if('Notification'in window&&Notification.permission==='defau
 
 window.addEventListener('online',()=>document.getElementById('offbar').classList.remove('show'));
 window.addEventListener('offline',()=>document.getElementById('offbar').classList.add('show'));
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-
-/* ── SYNC: atualiza todos os dispositivos/abas quando o floor salva algo ── */
-window.addEventListener('storage', e => {
-  if(e.key !== 'pdr_pwa') return;
-  if(document.getElementById('app').style.display === 'none') return;
-  load(); /* recarrega S do localStorage atualizado */
-  refreshAll();
-  toast('Dados atualizados');
-});
-
-/* ── SYNC: recarrega estado ao voltar para a aba ou reabrir o app ── */
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState !== 'visible') return;
-  if(document.getElementById('app').style.display === 'none') return;
-  const before = JSON.stringify(S);
-  load();
-  if(JSON.stringify(S) !== before) refreshAll();
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  if(document.getElementById('app').style.display==='none')return;
   catchUpMissedRotations();
 });
-
-function refreshAll(){
-  renderTables();
-  renderDealers();
-  recalc();
-  const activeTab = ['mesas','dealers','rotacao','relatorio'].find(
-    t => document.getElementById('tab-'+t).style.display !== 'none'
-  );
-  if(activeTab === 'relatorio') renderReport();
-}
-
-/* ── Executa revezamentos que foram perdidos enquanto a página estava em segundo plano ── */
-function catchUpMissedRotations(){
-  const n = now();
-  const lastRot = S.lastRot ? new Date(S.lastRot) : null;
-
-  /* coleta todos os horários de revezamento das últimas 2h que já passaram */
-  const missed = [];
-  for(let h = n.getHours() - 2; h <= n.getHours(); h++){
-    for(const m of [23, 53]){
-      const t = new Date(n);
-      t.setHours(h, m, 0, 0);
-      /* passou, mas ocorreu depois do último revezamento registrado (ou nunca houve) */
-      if(t < n && (!lastRot || t > lastRot)){
-        missed.push(t);
-      }
-    }
-  }
-
-  if(missed.length === 0) return;
-
-  /* ordena cronologicamente e executa cada um */
-  missed.sort((a,b) => a - b);
-  missed.forEach(() => execRotSilent());
-
-  const count = missed.length;
-  toast(`${count} revezamento${count>1?'s':''} executado${count>1?'s':''} automaticamente`);
-  sendPush();
-}
-
-/* igual ao execRot mas sem verificar perfil e sem toast (chamado internamente) */
-function execRotSilent(){
-  const plan = calcPlan();
-  const moves = plan.filter(p => p.type === 'move');
-  const rests = plan.filter(p => p.type === 'rest');
-  if(!moves.length) return;
-  const restIds = new Set(rests.map(r => r.did));
-  const moveIds = new Set(moves.map(m => m.did));
-  rests.forEach(r => {
-    if(moveIds.has(r.did)) return;
-    const d = S.dealers.find(x => x.id === r.did);
-    if(d){ d.covCount = 0; d.tableId = null; }
-  });
-  moves.forEach(m => {
-    const t = S.tables.find(x => x.id === m.toTable); if(!t) return;
-    if(t.dealerId && t.dealerId !== m.did && !restIds.has(t.dealerId)){
-      const old = S.dealers.find(x => x.id === t.dealerId);
-      if(old){ old.covCount = Math.max(0,(old.covCount||1)-1); if(old.covCount===0) old.tableId=null; }
-    }
-    const d = S.dealers.find(x => x.id === m.did);
-    if(d){ d.covCount = m.mult; d.tableId = m.toTable; t.dealerId = d.id; }
-  });
-  S.tables.forEach(t => { if(t.dealerId && !S.dealers.find(d => d.id === t.dealerId)) t.dealerId = null; });
-  S.rotCount++;
-  S.lastRot = Date.now();
-  save();
-  refreshAll();
-}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 function startApp(){
-  load();
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
   applyRoleUI();
   const ti=document.getElementById('dti');if(ti)ti.value=now().toTimeString().slice(0,5);
-  catchUpMissedRotations();
-  renderTables();renderDealers();recalc();renderReport();
+  startRealtimeSync();
   if(!window._clockStarted){
     window._clockStarted=true;
     updateClock();
     setInterval(updateClock,1000);
-    /* sync leve a cada 5s como fallback para navegadores que bloqueiam storage event */
-    setInterval(()=>{
-      if(document.getElementById('app').style.display==='none') return;
-      const before=JSON.stringify(S);
-      load();
-      if(JSON.stringify(S)!==before){
-        refreshAll();
-      }
-    }, 5000);
+    setInterval(()=>{if(document.getElementById('app').style.display!=='none'){renderDealers();if(document.getElementById('tab-relatorio').style.display!=='none')renderReport();}},30000);
   }
   reqNotif();
   if(!navigator.onLine)document.getElementById('offbar').classList.add('show');
 }
 
-/* Auto-login via sessionStorage */
+/* ── BOOT ── */
 (function(){
-  try{const sess=sessionStorage.getItem('pdr_sess');if(sess){const{u,role}=JSON.parse(sess);if(USERS[u]){currentUser=u;currentRole=role;startApp();return;}}}catch(e){}
+  const cfg=loadFirebaseConfig();
+  if(cfg){
+    try{
+      initFirebase(cfg);
+      document.getElementById('cfg-screen').style.display='none';
+      try{
+        const sess=sessionStorage.getItem('pdr_sess');
+        if(sess){const{u,role}=JSON.parse(sess);if(USERS[u]){currentUser=u;currentRole=role;startApp();return;}}
+      }catch(e){}
+      document.getElementById('login-screen').style.display='flex';
+    }catch(e){
+      document.getElementById('cfg-screen').style.display='flex';
+    }
+  }else{
+    document.getElementById('cfg-screen').style.display='flex';
+  }
 })();
 </script>
 </body>
