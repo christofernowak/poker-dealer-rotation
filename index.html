@@ -174,19 +174,16 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
     <div class="cfg-steps">
       <b>Como obter as credenciais:</b><br>
       1. Acesse <b>console.firebase.google.com</b><br>
-      2. Crie um projeto (gratis)<br>
-      3. Ative o <b>Firestore Database</b> em modo producao<br>
-      4. Va em <b>Configuracoes do projeto &gt; Seus apps &gt; Web</b><br>
-      5. Copie os valores do <b>firebaseConfig</b> abaixo<br>
-      6. No Firestore, va em <b>Regras</b> e cole:<br>
-      <span style="font-family:monospace;font-size:10px;color:#aaa">allow read, write: if true;</span>
+      2. Abra o projeto <b>DealerRotation</b><br>
+      3. No menu lateral: <b>Bancos de dados → Realtime Database</b><br>
+      4. Clique <b>"Criar banco de dados"</b> → modo teste → Criar<br>
+      5. Copie a URL do banco (ex: <b>https://dealerrotation-default-rtdb.firebaseio.com</b>)<br>
+      6. Va em <b>Configuracoes → Geral → Seus apps</b> e copie a <b>apiKey</b>
     </div>
     <label>API Key</label>
     <input type="text" id="fb-apikey" placeholder="AIzaSy..."/>
-    <label>Auth Domain</label>
-    <input type="text" id="fb-authdomain" placeholder="meu-projeto.firebaseapp.com"/>
-    <label>Project ID</label>
-    <input type="text" id="fb-projectid" placeholder="meu-projeto"/>
+    <label>Database URL</label>
+    <input type="text" id="fb-dburl" placeholder="https://seu-projeto-default-rtdb.firebaseio.com"/>
     <button class="cfg-btn" onclick="saveFirebaseConfig()">CONECTAR E SALVAR</button>
     <div class="cfg-err" id="cfg-err">Erro ao conectar. Verifique as credenciais.</div>
   </div>
@@ -303,7 +300,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
 const USERS={'floor01':{pass:'123456',role:'floor'},'dealer':{pass:'123',role:'dealer'}};
@@ -316,33 +313,31 @@ function loadFirebaseConfig(){
 }
 function saveFirebaseConfig(){
   const apiKey=document.getElementById('fb-apikey').value.trim();
-  const authDomain=document.getElementById('fb-authdomain').value.trim();
-  const projectId=document.getElementById('fb-projectid').value.trim();
-  if(!apiKey||!authDomain||!projectId){
-    showCfgErr('Preencha todos os campos');return;
+  const dbUrl=document.getElementById('fb-dburl').value.trim();
+  if(!apiKey||!dbUrl){showCfgErr('Preencha todos os campos');return;}
+  if(!dbUrl.startsWith('https://')||!dbUrl.includes('firebaseio.com')){
+    showCfgErr('URL invalida. Deve ser https://seu-projeto-default-rtdb.firebaseio.com');return;
   }
-  const cfg={apiKey,authDomain,projectId};
+  const cfg={apiKey,databaseURL:dbUrl};
   localStorage.setItem('pdr_fbcfg',JSON.stringify(cfg));
-  /* recarrega a pagina para inicializar o Firebase limpo */
   window.location.reload();
 }
 function showCfgErr(msg){
   const el=document.getElementById('cfg-err');el.textContent=msg;el.classList.add('show');
 }
 function resetFirebaseConfig(){
-  if(!confirm('Reconfigurar o Firebase? Voce precisara inserir as credenciais novamente.'))return;
+  if(!confirm('Reconfigurar o Firebase?'))return;
   localStorage.removeItem('pdr_fbcfg');
   sessionStorage.removeItem('pdr_sess');
   window.location.reload();
 }
 function initFirebase(cfg){
   if(firebase.apps.length){
-    db=firebase.app().firestore();
+    db=firebase.app().database();
     return;
   }
   firebase.initializeApp(cfg);
-  db=firebase.firestore();
-  try{db.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
+  db=firebase.app().database();
 }
 
 /* ── LOGIN ── */
@@ -384,13 +379,13 @@ function applyRoleUI(){
 const COLORS=['#c9a84c','#2980b9','#27ae60','#8e44ad','#e67e22','#e74c3c','#1abc9c','#d35400','#16a085','#f39c12','#3498db','#e91e63'];
 let S={tables:[],dealers:[],rotCount:0,lastRot:null};
 
-/* Salva no Firestore — unico documento 'state' na colecao 'tournament' */
+/* Salva no Realtime Database */
 function save(){
   if(!db)return;
   setSyncStatus('syncing');
-  db.collection('tournament').doc('state').set(S)
+  db.ref('tournament/state').set(S)
     .then(()=>setSyncStatus('ok'))
-    .catch(()=>setSyncStatus('err'));
+    .catch(e=>{setSyncStatus('err');console.error('Save error:',e);});
 }
 
 function setSyncStatus(status){
@@ -398,21 +393,50 @@ function setSyncStatus(status){
   if(dot)dot.className='sync-dot '+status;
 }
 
-/* Inicia listener em tempo real — quando qualquer dispositivo salva, todos recebem */
+/* Inicia listener em tempo real — Realtime Database */
 function startRealtimeSync(){
-  if(unsubscribe)unsubscribe();
+  if(!db){showSyncError('Firebase nao inicializado. Reconfigure.');return;}
+  if(unsubscribe){unsubscribe();unsubscribe=null;}
   setSyncStatus('syncing');
-  unsubscribe=db.collection('tournament').doc('state').onSnapshot(
+  const ref=db.ref('tournament/state');
+  const handler=ref.on('value',
     snap=>{
       setSyncStatus('ok');
-      if(!snap.exists){S={tables:[],dealers:[],rotCount:0,lastRot:null};refreshAll();return;}
-      const remote=snap.data();
-      S=remote;
+      hideSyncError();
+      if(!snap.exists()||snap.val()===null){
+        S={tables:[],dealers:[],rotCount:0,lastRot:null};
+        refreshAll();return;
+      }
+      S=snap.val();
       catchUpMissedRotations();
       refreshAll();
     },
-    err=>{setSyncStatus('err');console.error(err);}
+    err=>{
+      setSyncStatus('err');
+      const msg=err.code==='PERMISSION_DENIED'
+        ?'Permissao negada — no Firebase va em Realtime Database → Regras e mude para: {\"rules\":{\".\":{\"read\":\"true\",\"write\":\"true\"}}}'
+        :'Erro: '+err.message;
+      showSyncError(msg);
+      console.error('RTDB error:',err);
+    }
   );
+  unsubscribe=()=>ref.off('value',handler);
+}
+function showSyncError(msg){
+  let el=document.getElementById('sync-error-bar');
+  if(!el){
+    el=document.createElement('div');
+    el.id='sync-error-bar';
+    el.style.cssText='background:#3a0e0e;border:1px solid #c0392b;border-radius:8px;padding:10px 12px;margin:10px;font-size:11px;color:#ff8a7a;line-height:1.6;';
+    const app=document.getElementById('app');
+    app.insertBefore(el,app.children[1]);
+  }
+  el.innerHTML='<b>Erro de conexao:</b> '+msg+'<br><button onclick="resetFirebaseConfig()" style="margin-top:6px;background:transparent;border:1px solid #ff8a7a;color:#ff8a7a;padding:3px 10px;border-radius:5px;font-size:10px;cursor:pointer">Reconfigurar Firebase</button>';
+  el.style.display='block';
+}
+function hideSyncError(){
+  const el=document.getElementById('sync-error-bar');
+  if(el)el.style.display='none';
 }
 
 const now=()=>new Date();
