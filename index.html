@@ -322,12 +322,9 @@ function saveFirebaseConfig(){
     showCfgErr('Preencha todos os campos');return;
   }
   const cfg={apiKey,authDomain,projectId};
-  try{
-    initFirebase(cfg);
-    localStorage.setItem('pdr_fbcfg',JSON.stringify(cfg));
-    document.getElementById('cfg-screen').style.display='none';
-    document.getElementById('login-screen').style.display='flex';
-  }catch(e){showCfgErr('Erro: '+e.message);}
+  localStorage.setItem('pdr_fbcfg',JSON.stringify(cfg));
+  /* recarrega a pagina para inicializar o Firebase limpo */
+  window.location.reload();
 }
 function showCfgErr(msg){
   const el=document.getElementById('cfg-err');el.textContent=msg;el.classList.add('show');
@@ -335,15 +332,17 @@ function showCfgErr(msg){
 function resetFirebaseConfig(){
   if(!confirm('Reconfigurar o Firebase? Voce precisara inserir as credenciais novamente.'))return;
   localStorage.removeItem('pdr_fbcfg');
-  doLogout();
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('cfg-screen').style.display='flex';
+  sessionStorage.removeItem('pdr_sess');
+  window.location.reload();
 }
 function initFirebase(cfg){
-  if(firebase.apps.length)firebase.app().delete();
+  if(firebase.apps.length){
+    db=firebase.app().firestore();
+    return;
+  }
   firebase.initializeApp(cfg);
   db=firebase.firestore();
-  db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  try{db.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
 }
 
 /* ── LOGIN ── */
