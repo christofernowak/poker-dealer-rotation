@@ -134,6 +134,12 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 .toast.show{transform:translateX(-50%) translateY(0)}
 .offline-bar{background:#444;color:#ddd;text-align:center;font-size:11px;padding:4px;display:none}
 .offline-bar.show{display:block}
+/* rotation editor */
+.rot-edit-row{background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:9px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px;cursor:grab;user-select:none}
+.rot-edit-row.dragging{opacity:.3}.rot-edit-row.drag-over{border-top:2px solid var(--gold)}
+.rot-edit-mesa{font-size:11px;color:var(--gold);font-weight:bold;min-width:48px;flex-shrink:0}
+.rot-edit-select{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.2);border-radius:5px;padding:5px 6px;color:var(--tx);font-size:12px;font-family:inherit}
+.rot-edit-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:bold;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -211,10 +217,27 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
   <!-- ROTACAO -->
   <div id="tab-rotacao" style="display:none">
     <div class="sec" style="margin-top:10px">
-      <div class="sec-hdr"><span class="sec-ttl">Plano de Rotacao</span><button class="btn sm" onclick="recalc()">Recalcular</button></div>
+      <div class="sec-hdr">
+        <span class="sec-ttl">Plano de Rotacao</span>
+        <div style="display:flex;gap:5px">
+          <button class="btn sm" onclick="recalc()">Recalcular</button>
+          <button class="btn sm floor-only" id="btn-edit-rot" onclick="toggleEditRot()">Editar</button>
+        </div>
+      </div>
       <div id="rpb"></div>
+      <!-- Editor manual de rotacao -->
+      <div id="rot-editor" style="display:none;margin-top:8px">
+        <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px;margin-bottom:8px;font-size:11px;color:var(--txm)">
+          Arraste para reordenar · Troque o dealer de cada mesa · <span style="color:var(--gold)">Clique em Salvar para aplicar</span>
+        </div>
+        <div id="rot-edit-list"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn sm" onclick="toggleEditRot()" style="flex:1">Cancelar</button>
+          <button class="btn pri sm" onclick="saveEditedRot()" style="flex:2">Salvar Rotacao</button>
+        </div>
+      </div>
     </div>
-    <div class="sec floor-only">
+    <div class="sec floor-only" id="exec-rot-sec">
       <div style="background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:var(--r);padding:11px;text-align:center">
         <p style="font-size:11px;color:var(--txm);margin-bottom:9px">Aplicar rotacao planejada agora</p>
         <button class="btn pri" onclick="execRot()" style="width:100%;padding:12px;font-size:14px">EXECUTAR REVEZAMENTO AGORA</button>
@@ -649,11 +672,138 @@ function renderRotPlan(plan){
   if(warns.length)warns.forEach(w=>{html+=`<div style="background:rgba(192,57,43,.12);border:1px solid rgba(192,57,43,.4);border-radius:8px;padding:9px 11px;margin-top:8px;font-size:11px;color:#ff8a7a">${w.msg}</div>`;});
   box.innerHTML=html;
 }
-function recalc(){renderRotPlan(calcPlan());}
+/* ── ROTATION EDITOR ── */
+let editMode=false;
+let customPlan=null; // overrides calcPlan when set
+let dragRotIdx=null;
 
-function execRot(){if(currentRole!=='floor')return;execRotSilent();toast('Revezamento executado!');}
+function toggleEditRot(){
+  if(currentRole!=='floor')return;
+  editMode=!editMode;
+  const editor=document.getElementById('rot-editor');
+  const rpb=document.getElementById('rpb');
+  const execSec=document.getElementById('exec-rot-sec');
+  const btn=document.getElementById('btn-edit-rot');
+  if(editMode){
+    editor.style.display='block';
+    rpb.style.display='none';
+    if(execSec)execSec.style.display='none';
+    if(btn)btn.textContent='Fechar';
+    renderRotEditor();
+  }else{
+    editor.style.display='none';
+    rpb.style.display='block';
+    if(execSec)execSec.style.display='block';
+    if(btn)btn.textContent='Editar';
+    recalc();
+  }
+}
+
+function renderRotEditor(){
+  const tables=S.tables.slice();
+  const dealers=S.dealers.filter(d=>!d.paused&&!d.checkOut&&isAvailableAtNextRot(d));
+  const plan=customPlan||calcPlan();
+  const moves=plan.filter(p=>p.type==='move');
+
+  // Build a map of table -> current assigned dealer from plan
+  const tableAssign=new Map(); // tableId -> dealerId
+  moves.forEach(m=>tableAssign.set(m.toTable,m.did));
+
+  const list=document.getElementById('rot-edit-list');
+  list.innerHTML=tables.map((t,idx)=>{
+    const assignedId=tableAssign.get(t.id)||'';
+    const dealerOpts=`<option value="">— vaga —</option>`+
+      dealers.map(d=>`<option value="${d.id}" ${d.id===assignedId?'selected':''}>${d.name}</option>`).join('');
+    const curDealer=t.dealerId?S.dealers.find(x=>x.id===t.dealerId):null;
+    return`<div class="rot-edit-row" draggable="true" id="rerow-${idx}"
+        ondragstart="reDragStart(${idx})" ondragover="reDragOver(event,${idx})"
+        ondrop="reDrop(${idx})" ondragleave="reDragLeave(${idx})">
+      <span style="color:var(--txm);font-size:14px;cursor:grab">&#8942;&#8942;</span>
+      <span class="rot-edit-mesa">Mesa ${t.num}</span>
+      <div style="flex:1;min-width:0">
+        <select class="rot-edit-select" id="resel-${t.id}" onchange="onRotEditChange()">
+          ${dealerOpts}
+        </select>
+        ${curDealer?`<div style="font-size:9px;color:var(--txm);margin-top:2px">Atual: ${curDealer.name}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onRotEditChange(){
+  // Rebuild customPlan from current editor selects
+  const tables=S.tables.slice();
+  const moves=[];
+  const usedDealers=new Set();
+  tables.forEach(t=>{
+    const sel=document.getElementById('resel-'+t.id);
+    if(!sel)return;
+    const did=parseInt(sel.value);
+    if(!did||isNaN(did))return;
+    if(usedDealers.has(did)){
+      // Duplicate detected — highlight red and skip
+      sel.style.borderColor='var(--red)';return;
+    }
+    sel.style.borderColor='rgba(201,168,76,.2)';
+    usedDealers.add(did);
+    const d=S.dealers.find(x=>x.id===did);if(!d)return;
+    const nextMult=(d.covCount||0)+1;
+    let mlabel='ml-normal';
+    if(nextMult===2)mlabel='ml-2x';else if(nextMult===3)mlabel='ml-3x';
+    else if(nextMult===4)mlabel='ml-4x';else if(nextMult>=5)mlabel='ml-5x';
+    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult:nextMult,mlabel});
+  });
+  // Compute rests: dealers who are currently on a table but not in moves
+  const onTable=S.dealers.filter(d=>d.covCount>0&&!d.paused&&!d.checkOut);
+  const rests=onTable.filter(d=>!usedDealers.has(d.id)).map(d=>({type:'rest',dname:d.name,did:d.id,msg:`era ${d.covCount}x`}));
+  customPlan=[...moves,...rests];
+}
+
+function saveEditedRot(){
+  onRotEditChange(); // ensure customPlan is up to date
+  // Validate: check for duplicates
+  const tables=S.tables.slice();
+  const usedIds=new Set();let hasDup=false;
+  tables.forEach(t=>{
+    const sel=document.getElementById('resel-'+t.id);if(!sel)return;
+    const did=parseInt(sel.value);if(!did||isNaN(did))return;
+    if(usedIds.has(did)){hasDup=true;}
+    usedIds.add(did);
+  });
+  if(hasDup){toast('Dealer duplicado! Corrija antes de salvar.');return;}
+  // Apply and close editor
+  toggleEditRot();
+  recalc();
+  toast('Rotacao atualizada!');
+}
+
+/* Drag-and-drop for rotation editor rows (reorder tables in editor) */
+function reDragStart(idx){dragRotIdx=idx;setTimeout(()=>{const el=document.getElementById('rerow-'+idx);if(el)el.classList.add('dragging');},0);}
+function reDragOver(e,idx){e.preventDefault();const el=document.getElementById('rerow-'+idx);if(el&&idx!==dragRotIdx)el.classList.add('drag-over');}
+function reDragLeave(idx){const el=document.getElementById('rerow-'+idx);if(el)el.classList.remove('drag-over');}
+function reDrop(toIdx){
+  if(dragRotIdx===null||dragRotIdx===toIdx)return;
+  const arr=S.tables;const moved=arr.splice(dragRotIdx,1)[0];arr.splice(toIdx,0,moved);
+  dragRotIdx=null;renderRotEditor();
+}
+
+function recalc(){
+  if(!editMode){customPlan=null;renderRotPlan(calcPlan());}
+}
+
+function execRot(){
+  if(currentRole!=='floor')return;
+  execRotSilent();
+  customPlan=null; // clear any manual edit after executing
+  editMode=false;
+  const editor=document.getElementById('rot-editor');if(editor)editor.style.display='none';
+  const rpb=document.getElementById('rpb');if(rpb)rpb.style.display='block';
+  const execSec=document.getElementById('exec-rot-sec');if(execSec)execSec.style.display='block';
+  const btn=document.getElementById('btn-edit-rot');if(btn)btn.textContent='Editar';
+  toast('Revezamento executado!');
+}
 function execRotSilent(){
-  const plan=calcPlan();
+  const plan=customPlan||calcPlan();
   const moves=plan.filter(p=>p.type==='move');const rests=plan.filter(p=>p.type==='rest');
   if(!moves.length)return;
   const restIds=new Set(rests.map(r=>r.did));const moveIds=new Set(moves.map(m=>m.did));
