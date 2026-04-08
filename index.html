@@ -913,15 +913,29 @@ function exportPDF(){
 }
 
 /* HISTORY */
+function deleteHistory(idx){
+  if(currentRole!=='floor')return;
+  S.history.splice(idx,1);
+  save();renderHistory();
+  toast('Registro removido');
+}
 function renderHistory(){
   const list=document.getElementById('hist-list');
   const hist=S.history||[];
   document.getElementById('hist-count').textContent=hist.length;
   if(!hist.length){list.innerHTML='<div style="text-align:center;color:var(--txm);font-size:11px;padding:20px">Nenhum revezamento realizado ainda.</div>';return;}
-  list.innerHTML=hist.map(h=>{
+  const isFloor=currentRole==='floor';
+  list.innerHTML=hist.map((h,idx)=>{
     const movesHtml=(h.moves||[]).map(m=>`<div class="hitem-move"><span>&#8594;</span><strong>${m.name}</strong><span>Mesa ${m.table}${m.mult>1?' ('+m.mult+'x)':''}</span></div>`).join('');
     const restsHtml=(h.rests&&h.rests.length)?`<div class="hitem-move" style="color:var(--txm)"><span>&#8595;</span><span>Descanso: ${h.rests.map(r=>r.name).join(', ')}</span></div>`:'';
-    return`<div class="hitem"><div class="hitem-time">&#9670; ${h.time}</div>${movesHtml}${restsHtml}</div>`;
+    const delBtn=isFloor?`<button class="btn dng sm" onclick="deleteHistory(${idx})" style="padding:2px 7px;font-size:10px;flex-shrink:0" title="Remover este registro">&#x2715;</button>`:'';
+    return`<div class="hitem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div class="hitem-time" style="margin-bottom:0">&#9670; ${h.time}</div>
+        ${delBtn}
+      </div>
+      ${movesHtml}${restsHtml}
+    </div>`;
   }).join('');
 }
 
