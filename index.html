@@ -220,7 +220,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
       <div class="sec-hdr">
         <span class="sec-ttl">Plano de Rotacao</span>
         <div style="display:flex;gap:5px">
-          <button class="btn sm" onclick="recalc()">Recalcular</button>
+          <button class="btn sm" onclick="clearAndRecalc()">Recalcular</button>
           <button class="btn sm floor-only" id="btn-edit-rot" onclick="toggleEditRot()">Editar</button>
         </div>
       </div>
@@ -691,11 +691,13 @@ function toggleEditRot(){
     if(btn)btn.textContent='Fechar';
     renderRotEditor();
   }else{
+    // Cancel — discard edits and go back to auto plan
+    customPlan=null;
     editor.style.display='none';
     rpb.style.display='block';
     if(execSec)execSec.style.display='block';
     if(btn)btn.textContent='Editar';
-    recalc();
+    renderRotPlan(calcPlan());
   }
 }
 
@@ -760,7 +762,7 @@ function onRotEditChange(){
 }
 
 function saveEditedRot(){
-  onRotEditChange(); // ensure customPlan is up to date
+  onRotEditChange(); // rebuild customPlan from selects
   // Validate: check for duplicates
   const tables=S.tables.slice();
   const usedIds=new Set();let hasDup=false;
@@ -771,10 +773,15 @@ function saveEditedRot(){
     usedIds.add(did);
   });
   if(hasDup){toast('Dealer duplicado! Corrija antes de salvar.');return;}
-  // Apply and close editor
-  toggleEditRot();
-  recalc();
-  toast('Rotacao atualizada!');
+  // Close editor WITHOUT resetting customPlan
+  editMode=false;
+  const editor=document.getElementById('rot-editor');if(editor)editor.style.display='none';
+  const rpb=document.getElementById('rpb');if(rpb)rpb.style.display='block';
+  const execSec=document.getElementById('exec-rot-sec');if(execSec)execSec.style.display='block';
+  const btn=document.getElementById('btn-edit-rot');if(btn)btn.textContent='Editar';
+  // Render the customPlan
+  if(customPlan)renderRotPlan(customPlan);
+  toast('Rotacao salva! Clique em Executar para aplicar.');
 }
 
 /* Drag-and-drop for rotation editor rows (reorder tables in editor) */
@@ -788,7 +795,15 @@ function reDrop(toIdx){
 }
 
 function recalc(){
-  if(!editMode){customPlan=null;renderRotPlan(calcPlan());}
+  if(!editMode){
+    if(!customPlan){renderRotPlan(calcPlan());}
+    else{renderRotPlan(customPlan);}
+  }
+}
+function clearAndRecalc(){
+  customPlan=null;
+  renderRotPlan(calcPlan());
+  toast('Plano recalculado automaticamente');
 }
 
 function execRot(){
