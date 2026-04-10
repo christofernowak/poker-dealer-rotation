@@ -896,19 +896,24 @@ function dDrop(toIdx){
   dragDealerIdx=null;save();renderDealers();recalc();
 }
 
-/* ROTATION PLAN
-  EXACT LOGIC (from diagram):
-  - Break dealers enter the tables that become FREE (tables whose dealer is going to rest)
-  - When there are fewer break dealers than tables:
-      Dealer A (break) → Mesa X (first free table)
-      Dealer of Mesa X → Mesa X+1 (NEXT table, not last)
-      Dealer of Mesa X+1 → rest
-  - The cascade goes one step at a time: each entrant displaces ONE dealer
-    who moves to the NEXT sequential table and displaces THAT dealer to rest
-  - Tables are processed in their display order (drag-and-drop order)
+/* ROTATION PLAN — Exact circular queue
+   Transition rule for N dealers, T tables, each dealer has queuePos 0..N-1:
+   - pos 0 (M1 worker)      → pos 1        (advances to M2, stays working)
+   - pos 1..T-1 (workers)   → pos T..N-2   (go to rest)
+   - pos N-1 (longest rest) → pos 0        (enters M1)
+   - pos T..N-2 (resters)   → pos T-1..1   (enter last tables, reversed)
+   Workers at positions 0..T-1 are assigned to tables[0..T-1].
 */
+function nextQueuePos(p,N,T){
+  if(N<=T)return p; /* more tables than dealers: everyone stays */
+  if(p===0)return 1;
+  if(p>=1&&p<=T-1)return T+(p-1);
+  if(p===N-1)return 0;
+  return(T-1)-(p-T);
+}
+
 function calcPlan(){
-  const tables=S.tables.slice(); /* display order */
+  const tables=S.tables.slice();
   const dealers=S.dealers;
   if(!tables.length||!dealers.length)return[];
 
@@ -916,6 +921,7 @@ function calcPlan(){
   const notYet=dealers.filter(d=>!isAvailableAtNextRot(d)&&!d.paused&&!d.checkOut);
   const paused=dealers.filter(d=>d.paused||d.checkOut);
   const tCount=tables.length;
+  const N=available.length;
   const plan=[];
 
   if(!available.length){
@@ -924,165 +930,70 @@ function calcPlan(){
     return plan;
   }
 
-  const N=available.length;
+  /* ── Initialize queuePos if missing ──
+     On-table dealers get positions tCount..N-1 (they are currently working,
+     which after ONE transition will map to their correct slots).
+     Actually: assign based on current table position directly.
+     Dealer at tables[0] gets queuePos=0, tables[1] gets 1, etc.
+     Break dealers get positions tCount..N-1 (in longest-wait order). */
   const onTable=available.filter(d=>d.covCount>0);
   const onBreak=available.filter(d=>!(d.covCount>0));
-
-  /* Sort break dealers: never-entered first, then longest break.
-     Tiebreaker: use lastTableId index to preserve circular order —
-     dealer who was at an earlier table position gets priority. */
-  const breakSorted=[...onBreak].sort((a,b)=>{
-    const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
-    if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
-    const timeDiff=(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
-    if(Math.abs(timeDiff)>2000)return timeDiff; /* different rests */
-    /* Same rest time: sort by lastTableId position so queue stays circular */
-    const aIdx=a.lastTableId?tables.findIndex(t=>t.id===a.lastTableId):-1;
-    const bIdx=b.lastTableId?tables.findIndex(t=>t.id===b.lastTableId):-1;
-    return aIdx-bIdx;
-  });
-
-  const breakFlagIds=new Set(tables.filter(t=>t.breakFlag&&t.dealerId).map(t=>t.dealerId));
-
-  /* Build a map: tableId -> current dealer */
-  const tableDealer=new Map();
-  tables.forEach(t=>{
-    if(t.dealerId){const d=dealers.find(x=>x.id===t.dealerId);if(d)tableDealer.set(t.id,d);}
-  });
-
-  /* assigned[tableId] = dealer who will work this table next rotation */
-  const assigned=new Map();
-  /* restSet: dealer ids going to rest */
-  const restSet=new Set();
-  /* usedDealers: placed already */
-  const usedDealers=new Set();
-
-  /*
-    ALGORITHM:
-    - breakCount = how many dealers are coming off break
-    - If breakCount >= tCount: every table gets a fresh dealer, ALL on-table rest. No cascade.
-    - If breakCount < tCount: fill what we can from break, then cascade for remaining tables.
-      Each break dealer entering displaces the current dealer to the NEXT table,
-      and THAT table's dealer rests. One cascade step per break entrant.
-  */
-  const breakCount=breakSorted.length;
-  const needCascade=breakCount<tCount;
-
-  for(const entrant of breakSorted){
-    if(usedDealers.has(entrant.id))continue;
-
-    /* Find target table: next after lastTableId in circular order */
-    const freeTables=tables.filter(t=>!assigned.has(t.id));
-    if(!freeTables.length)break;
-
-    let targetTable=null;
-    if(entrant.lastTableId){
-      const lastIdx=tables.findIndex(t=>t.id===entrant.lastTableId);
-      if(lastIdx>=0){
-        for(let offset=1;offset<=tables.length;offset++){
-          const candidate=tables[(lastIdx+offset)%tables.length];
-          if(!assigned.has(candidate.id)){targetTable=candidate;break;}
-        }
-      }
-    }
-    if(!targetTable)targetTable=freeTables[0];
-    if(!targetTable)break;
-
-    assigned.set(targetTable.id,entrant);
-    usedDealers.add(entrant.id);
-
-    const displaced=tableDealer.get(targetTable.id);
-    if(!displaced||displaced.id===entrant.id)continue;
-
-    /* If enough break dealers to cover all tables, displaced dealer simply rests */
-    if(!needCascade||targetTable.breakFlag||breakFlagIds.has(displaced.id)){
-      restSet.add(displaced.id);
-      continue;
-    }
-
-    /* CASCADE: displaced dealer goes to NEXT table (only when not enough break dealers) */
-    const targetIdx=tables.findIndex(t=>t.id===targetTable.id);
-    let cascadeTable=null;
-    for(let i=targetIdx+1;i<tables.length;i++){
-      if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}
-    }
-    if(!cascadeTable){
-      for(let i=0;i<targetIdx;i++){
-        if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}
-      }
-    }
-
-    if(cascadeTable&&!usedDealers.has(displaced.id)){
-      assigned.set(cascadeTable.id,displaced);
-      usedDealers.add(displaced.id);
-      const displaced2=tableDealer.get(cascadeTable.id);
-      if(displaced2&&displaced2.id!==displaced.id&&!usedDealers.has(displaced2.id)){
-        restSet.add(displaced2.id);
-      }
-    }else{
-      restSet.add(displaced.id);
-    }
+  const needsInit=available.some(d=>d.queuePos===undefined||d.queuePos===null);
+  if(needsInit){
+    const onTableByTablePos=[...onTable].sort((a,b)=>{
+      const ai=tables.findIndex(t=>t.dealerId===a.id);
+      const bi=tables.findIndex(t=>t.dealerId===b.id);
+      return ai-bi;
+    });
+    const onBreakByWait=[...onBreak].sort((a,b)=>{
+      const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
+      if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
+      return(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
+    });
+    /* Break dealers at front (they enter next), workers at back */
+    onBreakByWait.forEach((d,i)=>{d.queuePos=tCount+i;});
+    onTableByTablePos.forEach((d,i)=>{d.queuePos=i;});
   }
 
-  /* Untouched on-table dealers:
-     - If no cascade needed (enough break dealers): all rest
-     - If cascade needed: advance to next free table or stay */
-  const untouched=onTable.filter(d=>!usedDealers.has(d.id)&&!restSet.has(d.id));
-  for(const d of untouched){
-    if(!needCascade){
-      /* Enough break dealers — everyone on table rests */
-      restSet.add(d.id);
-      continue;
-    }
-    const curTable=S.tables.find(x=>x.dealerId===d.id);
-    if(!curTable)continue;
-    const curIdx=tables.findIndex(t=>t.id===curTable.id);
-    let nextTable=null;
-    for(let offset=1;offset<=tables.length;offset++){
-      const candidate=tables[(curIdx+offset)%tables.length];
-      if(!assigned.has(candidate.id)){nextTable=candidate;break;}
-    }
-    if(nextTable&&nextTable.id!==curTable.id){
-      const nextCur=tableDealer.get(nextTable.id);
-      if(nextCur&&nextCur.id!==d.id&&!usedDealers.has(nextCur.id)){
-        restSet.add(nextCur.id);
-      }
-      assigned.set(nextTable.id,d);
-      usedDealers.add(d.id);
-    }else{
-      if(curTable&&!assigned.has(curTable.id)){
-        assigned.set(curTable.id,d);usedDealers.add(d.id);
-      }
-    }
-  }
+  /* ── Compute NEXT positions using the formula ── */
+  const nextPos=new Map();
+  available.forEach(d=>{
+    nextPos.set(d.id, nextQueuePos(d.queuePos??0, N, tCount));
+  });
 
-  /* Build moves and rests */
+  /* ── Sort by next position to determine assignments ── */
+  const sorted=[...available].sort((a,b)=>(nextPos.get(a.id)??0)-(nextPos.get(b.id)??0));
+
+  /* First tCount in sorted order work the tables */
+  const workers=sorted.slice(0,tCount);
+  const resting=sorted.slice(tCount);
+
+  /* ── Build plan ── */
   const moves=[],rests=[];
-  tables.forEach(t=>{
-    const d=assigned.get(t.id);if(!d)return;
-    const isDoubling=onTable.some(x=>x.id===d.id);
-    const nextMult=isDoubling?(d.covCount||1)+1:1;
+  workers.forEach((d,i)=>{
+    if(!tables[i])return;
+    const wasOnTable=onTable.some(x=>x.id===d.id);
+    const nextMult=wasOnTable?(d.covCount||1)+1:1;
     let mlabel='ml-normal';
-    if(nextMult===2)mlabel='ml-2x';else if(nextMult===3)mlabel='ml-3x';
-    else if(nextMult===4)mlabel='ml-4x';else if(nextMult>=5)mlabel='ml-5x';
-    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult:nextMult,mlabel,isNew:!isDoubling});
+    if(nextMult===2)mlabel='ml-2x';else if(nextMult>=3)mlabel='ml-3x';
+    moves.push({type:'move',dname:d.name,did:d.id,toTable:tables[i].id,toNum:tables[i].num,
+      mult:nextMult,mlabel,isNew:!wasOnTable,nextQPos:nextPos.get(d.id)});
   });
-
-  restSet.forEach(id=>{
-    if(usedDealers.has(id))return;
-    const d=dealers.find(x=>x.id===id);if(!d)return;
+  resting.forEach(d=>{
     const dTable=S.tables.find(t=>t.dealerId===d.id);
     const isBF=dTable&&dTable.breakFlag;
-    rests.push({type:'rest',dname:d.name,did:id,msg:`era ${d.covCount}x`,breakFlag:isBF});
+    rests.push({type:'rest',dname:d.name,did:d.id,msg:`era ${d.covCount}x`,breakFlag:isBF,
+      nextQPos:nextPos.get(d.id)});
   });
 
   moves.forEach(m=>plan.push(m));
   rests.forEach(r=>plan.push(r));
   notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'pending',dname:d.name,did:d.id,msg:`Entra no rev. as ${fmts(frt)}`});});
   paused.forEach(d=>plan.push({type:'info',msg:`${d.name} — ${d.paused?'em pausa':'saiu'}`}));
-  if(N<tCount)plan.push({type:'warn',msg:`${tCount-N} mesa(s) sem dealer. Cascade ativo.`});
+  if(N<tCount)plan.push({type:'warn',msg:`${tCount-N} mesa(s) sem dealer.`});
   return plan;
 }
+
 function multLabel(m){if(m<=1)return{text:'ENTRA',cls:'ml-normal'};if(m===2)return{text:'2X',cls:'ml-2x'};if(m===3)return{text:'3X',cls:'ml-3x'};if(m===4)return{text:'4X',cls:'ml-4x'};return{text:m+'X',cls:'ml-5x'};}
 function renderRotPlan(plan){
   const box=document.getElementById('rpb');
@@ -1247,11 +1158,17 @@ function execRotSilent(){
   const plan=customPlan||calcPlan();
   const moves=plan.filter(p=>p.type==='move');const rests=plan.filter(p=>p.type==='rest');
   if(!moves.length)return;
-  const restIds=new Set(rests.map(r=>r.did));const moveIds=new Set(moves.map(m=>m.did));
+  const restIds=new Set(rests.map(r=>r.did));
+  const moveIds=new Set(moves.map(m=>m.did));
 
   /* History */
-  const entry={time:fmts(now()),timestamp:Date.now(),moves:moves.map(m=>({name:m.dname,table:m.toNum,mult:m.mult})),rests:rests.filter(r=>!moveIds.has(r.did)).map(r=>({name:r.dname}))};
-  if(!S.history)S.history=[];S.history.unshift(entry);if(S.history.length>50)S.history=S.history.slice(0,50);
+  const entry={time:fmts(now()),timestamp:Date.now(),
+    moves:moves.map(m=>({name:m.dname,table:m.toNum,mult:m.mult})),
+    rests:rests.filter(r=>!moveIds.has(r.did)).map(r=>({name:r.dname}))};
+  if(!S.history)S.history=[];S.history.unshift(entry);
+  if(S.history.length>50)S.history=S.history.slice(0,50);
+
+  /* Table history */
   if(!S.tableHistory)S.tableHistory={};
   moves.forEach(m=>{
     const key='t'+m.toTable;
@@ -1260,66 +1177,37 @@ function execRotSilent(){
     if(S.tableHistory[key].entries.length>100)S.tableHistory[key].entries=S.tableHistory[key].entries.slice(-100);
   });
 
-  /* Apply rests — set lastTableId to where dealer IS NOW (before being removed)
-     so when they return from break, they start from the NEXT table in sequence */
-  rests.forEach(r=>{
-    if(moveIds.has(r.did))return;
-    const d=S.dealers.find(x=>x.id===r.did);
-    if(d){
-      /* Find their current table */
-      const onT=S.tables.find(t=>t.dealerId===d.id);
-      if(onT){
-        /* lastTableId = where they ARE (the table they're leaving) */
-        d.lastTableId=onT.id;
-        onT.dealerId=null; /* free the table slot */
-      }
-      d.covCount=0;d.tableId=null;d.breakSince=Date.now();
-    }
+  /* Clear all table slots first */
+  S.tables.forEach(t=>{t.dealerId=null;});
+
+  /* Reset all available dealers to break state, then re-apply moves */
+  const available=S.dealers.filter(d=>!d.paused&&!d.checkOut&&isAvailable(d));
+  available.forEach(d=>{
+    d.covCount=0;d.tableId=null;d.breakSince=Date.now();
   });
 
-  /* Apply moves */
+  /* Apply moves — assign dealers to their new tables */
   moves.forEach(m=>{
     const t=S.tables.find(x=>x.id===m.toTable);if(!t)return;
-    /* Displace current dealer if different */
-    if(t.dealerId&&t.dealerId!==m.did&&!restIds.has(t.dealerId)){
-      const prev=S.dealers.find(x=>x.id===t.dealerId);
-      if(prev){prev.lastTableId=t.id;prev.covCount=Math.max(0,(prev.covCount||1)-1);if(prev.covCount===0){prev.tableId=null;prev.breakSince=Date.now();}}
-    }
-    const d=S.dealers.find(x=>x.id===m.did);
-    if(d){
-      d.covCount=m.mult;
-      d.tableId=m.toTable;
-      d.lastTableId=m.toTable; /* always track where they end up */
-      d.rotCount=(d.rotCount||0)+1;
-      d.breakSince=null;
-      t.dealerId=d.id;
-    }
+    const d=S.dealers.find(x=>x.id===m.did);if(!d)return;
+    d.covCount=1;
+    d.tableId=m.toTable;
+    d.lastTableId=m.toTable;
+    d.rotCount=(d.rotCount||0)+1;
+    d.breakSince=null;
+    t.dealerId=d.id;
   });
 
-  /* Update queuePos for circular rotation:
-     New workers (from break) get positions 0..entering-1
-     Continuing workers (doubling) get next positions
-     Resting dealers get positions tCount..N-1 */
-  const tCount=S.tables.filter(t=>t.dealerId).length;
-  const moveSet=new Set(moves.map(m=>m.did));
-  const restSet=new Set(rests.map(r=>r.did));
-  const available=S.dealers.filter(d=>!d.paused&&!d.checkOut&&isAvailable(d));
+  /* Apply exact queue transition formula */
   const N=available.length;
+  const tCount=moves.length;
   if(N>0){
-    /* New entrants (from break = isNew flag) get front positions */
-    const newEntrants=moves.filter(m=>m.isNew);
-    const doublers=moves.filter(m=>!m.isNew);
-    const restingDealers=available.filter(d=>!moveSet.has(d.id));
-    let pos=0;
-    newEntrants.forEach(m=>{const d=S.dealers.find(x=>x.id===m.did);if(d)d.queuePos=pos++;});
-    doublers.forEach(m=>{const d=S.dealers.find(x=>x.id===m.did);if(d)d.queuePos=pos++;});
-    restingDealers.sort((a,b)=>(a.breakSince||0)-(b.breakSince||0)).forEach(d=>{d.queuePos=pos++;});
+    available.forEach(d=>{
+      d.queuePos=nextQueuePos(d.queuePos??0, N, tCount);
+    });
   }
 
-  S.tables.forEach(t=>{
-    if(t.dealerId&&!S.dealers.find(d=>d.id===t.dealerId))t.dealerId=null;
-    if(t.breakFlag)t.breakFlag=false;
-  });
+  S.tables.forEach(t=>{if(t.breakFlag)t.breakFlag=false;});
   S.rotCount++;S.lastRot=Date.now();save();
 }
 function catchUpMissedRotations(){
