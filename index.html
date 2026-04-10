@@ -928,11 +928,18 @@ function calcPlan(){
   const onTable=available.filter(d=>d.covCount>0);
   const onBreak=available.filter(d=>!(d.covCount>0));
 
-  /* Sort break dealers: never-entered first, then longest break */
+  /* Sort break dealers: never-entered first, then longest break.
+     Tiebreaker: use lastTableId index to preserve circular order —
+     dealer who was at an earlier table position gets priority. */
   const breakSorted=[...onBreak].sort((a,b)=>{
     const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
     if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
-    return(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
+    const timeDiff=(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
+    if(Math.abs(timeDiff)>2000)return timeDiff; /* different rests */
+    /* Same rest time: sort by lastTableId position so queue stays circular */
+    const aIdx=a.lastTableId?tables.findIndex(t=>t.id===a.lastTableId):-1;
+    const bIdx=b.lastTableId?tables.findIndex(t=>t.id===b.lastTableId):-1;
+    return aIdx-bIdx;
   });
 
   const breakFlagIds=new Set(tables.filter(t=>t.breakFlag&&t.dealerId).map(t=>t.dealerId));
@@ -1025,14 +1032,36 @@ function calcPlan(){
     }
   }
 
-  /* Any table still unassigned: dealer stays (no one to relieve them) */
-  /* Any on-table dealer not assigned and not in restSet also stays */
-  /* Mark remaining on-table dealers who were not touched */
-  onTable.filter(d=>!usedDealers.has(d.id)&&!restSet.has(d.id)).forEach(d=>{
-    /* Find their current table and re-assign them (they stay) */
-    const t=S.tables.find(x=>x.dealerId===d.id);
-    if(t&&!assigned.has(t.id)){assigned.set(t.id,d);usedDealers.add(d.id);}
-  });
+  /* Dealers not touched by cascade: they need to ADVANCE to next table too.
+     If their next table is already taken, they stay. If free, they move.
+     This ensures nobody stays on the same table indefinitely. */
+  const untouched=onTable.filter(d=>!usedDealers.has(d.id)&&!restSet.has(d.id));
+  for(const d of untouched){
+    const curTable=S.tables.find(x=>x.dealerId===d.id);
+    if(!curTable)continue;
+    const curIdx=tables.findIndex(t=>t.id===curTable.id);
+    /* Try to find next free table after current */
+    let nextTable=null;
+    for(let offset=1;offset<=tables.length;offset++){
+      const candidate=tables[(curIdx+offset)%tables.length];
+      if(!assigned.has(candidate.id)){nextTable=candidate;break;}
+    }
+    if(nextTable&&nextTable.id!==curTable.id){
+      /* Move to next table — but first check if the dealer at nextTable needs to cascade */
+      const nextCur=tableDealer.get(nextTable.id);
+      if(nextCur&&nextCur.id!==d.id&&!usedDealers.has(nextCur.id)){
+        /* nextCur gets displaced — they rest */
+        restSet.add(nextCur.id);
+      }
+      assigned.set(nextTable.id,d);
+      usedDealers.add(d.id);
+    }else{
+      /* No next table free — stay on current table */
+      if(curTable&&!assigned.has(curTable.id)){
+        assigned.set(curTable.id,d);usedDealers.add(d.id);
+      }
+    }
+  }
 
   /* Build moves and rests */
   const moves=[],rests=[];
@@ -1238,22 +1267,40 @@ function execRotSilent(){
     if(S.tableHistory[key].entries.length>100)S.tableHistory[key].entries=S.tableHistory[key].entries.slice(-100);
   });
 
-  /* Apply rests */
+  /* Apply rests — set lastTableId to where dealer IS NOW (before being removed)
+     so when they return from break, they start from the NEXT table in sequence */
   rests.forEach(r=>{
     if(moveIds.has(r.did))return;
     const d=S.dealers.find(x=>x.id===r.did);
-    if(d){const onT=S.tables.find(t=>t.dealerId===d.id);if(onT)d.lastTableId=onT.id;d.covCount=0;d.tableId=null;d.breakSince=Date.now();}
+    if(d){
+      /* Find their current table */
+      const onT=S.tables.find(t=>t.dealerId===d.id);
+      if(onT){
+        /* lastTableId = where they ARE (the table they're leaving) */
+        d.lastTableId=onT.id;
+        onT.dealerId=null; /* free the table slot */
+      }
+      d.covCount=0;d.tableId=null;d.breakSince=Date.now();
+    }
   });
 
   /* Apply moves */
   moves.forEach(m=>{
     const t=S.tables.find(x=>x.id===m.toTable);if(!t)return;
+    /* Displace current dealer if different */
     if(t.dealerId&&t.dealerId!==m.did&&!restIds.has(t.dealerId)){
-      const old=S.dealers.find(x=>x.id===t.dealerId);
-      if(old){old.lastTableId=t.id;old.covCount=Math.max(0,(old.covCount||1)-1);if(old.covCount===0){old.tableId=null;old.breakSince=Date.now();}}
+      const prev=S.dealers.find(x=>x.id===t.dealerId);
+      if(prev){prev.lastTableId=t.id;prev.covCount=Math.max(0,(prev.covCount||1)-1);if(prev.covCount===0){prev.tableId=null;prev.breakSince=Date.now();}}
     }
     const d=S.dealers.find(x=>x.id===m.did);
-    if(d){d.covCount=m.mult;d.tableId=m.toTable;d.lastTableId=m.toTable;d.rotCount=(d.rotCount||0)+1;d.breakSince=null;t.dealerId=d.id;}
+    if(d){
+      d.covCount=m.mult;
+      d.tableId=m.toTable;
+      d.lastTableId=m.toTable; /* always track where they end up */
+      d.rotCount=(d.rotCount||0)+1;
+      d.breakSince=null;
+      t.dealerId=d.id;
+    }
   });
 
   /* Update queuePos for circular rotation:
