@@ -961,10 +961,26 @@ function calcPlan(){
   for(const entrant of breakSorted){
     if(usedDealers.has(entrant.id))continue;
 
-    /* Find first unassigned table (prefer not lastTable) */
-    const freePref=tables.filter(t=>!assigned.has(t.id)&&t.id!==entrant.lastTableId);
-    const freeAny=tables.filter(t=>!assigned.has(t.id));
-    const targetTable=freePref.length?freePref[0]:freeAny[0];
+    /* Find best table for this entrant coming off break:
+       - They should go to the table AFTER their lastTableId in sequence
+       - This ensures: Mesa1 → Mesa2(double) → rest → Mesa3 next time
+       - If lastTableId not found or no next table, use first free table */
+    const freeTables=tables.filter(t=>!assigned.has(t.id));
+    if(!freeTables.length)break;
+
+    let targetTable=null;
+    if(entrant.lastTableId){
+      const lastIdx=tables.findIndex(t=>t.id===entrant.lastTableId);
+      if(lastIdx>=0){
+        /* Look for next free table AFTER lastTableId in circular order */
+        for(let offset=1;offset<=tables.length;offset++){
+          const candidate=tables[(lastIdx+offset)%tables.length];
+          if(!assigned.has(candidate.id)){targetTable=candidate;break;}
+        }
+      }
+    }
+    /* Fallback: first free table */
+    if(!targetTable)targetTable=freeTables[0];
     if(!targetTable)break;
 
     /* Place entrant at this table */
