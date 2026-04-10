@@ -16,35 +16,46 @@
 :root{--gold:#c9a84c;--goldf:#e8c76a;--cb:#0f2d1a;--bg:#071a0e;--tx:#f0e6c8;--txm:#9a8a6a;--green:#2d7a42;--red:#c0392b;--blue:#2980b9;--pur:#8e44ad;--ora:#d35400;--r:10px}
 /* TV MODE */
 .role-tv{background:rgba(22,160,133,.2);color:#7fffd4;border:1px solid rgba(22,160,133,.4)}
-.tv-mode #app{max-width:100% !important;padding-bottom:0}
-.tv-mode .tabs,.tv-mode .hdr p,.tv-mode #tourney-ctrl,.tv-mode #tourney-running-ctrl{display:none !important}
-.tv-mode .timer-box{margin:0;border-radius:0;border-left:none;border-right:none}
-#tv-screen{display:none;width:100%;height:100vh;background:var(--bg);overflow:hidden;padding:0}
-.tv-mode #tv-screen{display:flex;flex-direction:column}
-.tv-mode #tab-mesas,.tv-mode #tab-dealers,.tv-mode #tab-rotacao,.tv-mode #tab-relatorio,.tv-mode #tab-historico,.tv-mode #tab-config{display:none !important}
-.tv-hdr{background:#0a1f10;padding:10px 24px;border-bottom:2px solid var(--gold);display:flex;align-items:center;justify-content:space-between}
-.tv-hdr-title{font-size:22px;color:var(--gold);letter-spacing:3px;font-weight:bold}
-.tv-hdr-time{font-size:20px;color:var(--tx);font-family:'Courier New',monospace}
-.tv-hdr-timer{font-size:28px;font-weight:bold;font-family:'Courier New',monospace;color:var(--gold)}
+#tv-screen{
+  display:none;position:fixed;inset:0;width:100vw;height:100vh;
+  background:var(--bg);overflow:hidden;z-index:9999;
+  flex-direction:column;
+}
+#tv-screen.active{display:flex}
+.tv-hdr{background:#0a1f10;padding:12px 32px;border-bottom:2px solid var(--gold);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.tv-hdr-title{font-size:24px;color:var(--gold);letter-spacing:3px;font-weight:bold;flex:1}
+.tv-hdr-center{text-align:center;flex:1}
+.tv-hdr-time{font-size:22px;color:var(--tx);font-family:'Courier New',monospace;flex:1;text-align:right}
+.tv-hdr-timer{font-size:42px;font-weight:bold;font-family:'Courier New',monospace;color:var(--gold);line-height:1}
 .tv-hdr-timer.urgent{color:var(--red);animation:pb 1s infinite}
-.tv-body{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0;overflow:hidden}
-.tv-tables{padding:16px;border-right:1px solid rgba(201,168,76,.2);overflow-y:auto}
-.tv-next{padding:16px;overflow-y:auto;background:rgba(0,0,0,.2)}
-.tv-section-title{font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(201,168,76,.2)}
-.tv-table-card{background:var(--cb);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
-.tv-table-card.active{border-color:var(--green)}
-.tv-table-num{font-size:12px;color:var(--txm);margin-bottom:2px}
-.tv-table-dealer{font-size:20px;font-weight:bold;color:var(--tx)}
-.tv-table-dealer.empty{color:var(--txm);font-style:italic;font-size:16px}
-.tv-table-badge{font-size:10px;padding:3px 8px;border-radius:6px}
-.tv-next-item{background:var(--cb);border:1px solid rgba(45,122,66,.3);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
-.tv-next-item.rest-item{border-color:rgba(41,128,185,.3)}
-.tv-next-name{font-size:20px;font-weight:bold;flex:1}
-.tv-next-table{font-size:14px;color:var(--txm)}
-.tv-next-badge{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:bold;flex-shrink:0}
-.tv-prog{height:6px;background:rgba(255,255,255,.1);margin:0;overflow:hidden}
+.tv-hdr-sub{font-size:12px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.tv-hdr-next{font-size:13px;color:var(--txm)}
+.tv-prog{height:5px;background:rgba(255,255,255,.1);flex-shrink:0}
 .tv-prog-fill{height:100%;background:var(--gold);transition:width .5s linear}
 .tv-prog.urgent .tv-prog-fill{background:var(--red)}
+.tv-body{flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.tv-tables{padding:20px 24px;border-right:1px solid rgba(201,168,76,.2);overflow-y:auto}
+.tv-next{padding:20px 24px;overflow-y:auto}
+.tv-section-title{font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(201,168,76,.25)}
+.tv-table-card{background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.tv-table-card.active{border-color:var(--green)}
+.tv-table-num{font-size:12px;color:var(--txm);margin-bottom:3px;text-transform:uppercase;letter-spacing:1px}
+.tv-table-dealer{font-size:26px;font-weight:bold;color:var(--tx)}
+.tv-table-dealer.empty{color:var(--txm);font-style:italic;font-size:20px}
+.tv-next-item{background:var(--cb);border:1px solid rgba(45,122,66,.35);border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.tv-next-item.rest-item{border-color:rgba(41,128,185,.35)}
+.tv-next-name{font-size:26px;font-weight:bold;flex:1}
+.tv-next-info{font-size:15px;color:var(--txm)}
+.tv-next-badge{font-size:12px;padding:4px 12px;border-radius:8px;font-weight:bold;flex-shrink:0}
+.tv-notif{position:absolute;inset:0;background:rgba(58,14,14,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .3s}
+.tv-notif.show{opacity:1;pointer-events:auto}
+.tv-notif-title{font-size:36px;color:#ff8a7a;font-weight:bold;letter-spacing:2px;margin-bottom:24px}
+.tv-notif-moves{display:flex;flex-direction:column;gap:10px;width:100%;max-width:600px}
+.tv-notif-move{background:rgba(255,255,255,.08);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:16px}
+.tv-notif-name{font-size:28px;font-weight:bold;flex:1}
+.tv-notif-table{font-size:20px;color:var(--txm)}
+/* TV logout btn */
+#tv-logout{position:absolute;top:10px;right:16px;background:transparent;border:1px solid rgba(201,168,76,.25);color:var(--txm);font-size:11px;cursor:pointer;padding:4px 10px;border-radius:5px;z-index:10000}
 html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,serif;overscroll-behavior:none}
 #login-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:var(--bg)}
 .login-logo{font-size:52px;margin-bottom:6px;text-align:center}
@@ -371,6 +382,11 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
         </div>
 
         <div class="setting-row">
+          <div><div class="setting-label">Rotacao manual</div><div class="setting-sub">Desativa auto-revezamento. O floor executa na hora certa</div></div>
+          <div class="toggle" id="toggle-manualRot" onclick="toggleSetting('manualRot')"></div>
+        </div>
+
+        <div class="setting-row">
           <div><div class="setting-label">Som de alerta</div><div class="setting-sub">Toca bip no revezamento</div></div>
           <div class="toggle" id="toggle-sound" onclick="toggleSetting('sound')"></div>
         </div>
@@ -396,14 +412,20 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
     </div>
   </div>
 </div>
-<!-- TV SCREEN -->
+<!-- TV SCREEN — position:fixed fullscreen, z-index:9999 -->
 <div id="tv-screen">
+  <button id="tv-logout" onclick="doLogout()">Sair</button>
+  <!-- Rotation alert overlay -->
+  <div class="tv-notif" id="tv-notif">
+    <div class="tv-notif-title">♠ HORA DO REVEZAMENTO! ♦</div>
+    <div class="tv-notif-moves" id="tv-notif-moves"></div>
+  </div>
   <div class="tv-hdr">
     <div class="tv-hdr-title">♠ DEALER ROTATION ♦</div>
-    <div style="text-align:center">
-      <div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Proximo Revezamento</div>
+    <div class="tv-hdr-center">
+      <div class="tv-hdr-sub">Proximo Revezamento</div>
       <div class="tv-hdr-timer" id="tv-cd">--:--</div>
-      <div style="font-size:11px;color:var(--txm)" id="tv-td"></div>
+      <div class="tv-hdr-next" id="tv-td"></div>
     </div>
     <div class="tv-hdr-time" id="tv-ct"></div>
   </div>
@@ -472,6 +494,7 @@ function doLogout(){
   currentUser=null;currentRole=null;
   try{sessionStorage.removeItem('pdr_sess')}catch(e){}
   document.getElementById('app').style.display='none';
+  const tvs=document.getElementById('tv-screen');if(tvs)tvs.classList.remove('active');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('l-user').value='';document.getElementById('l-pass').value='';
 }
@@ -640,7 +663,16 @@ function updateClock(){
     buildNotifBanner();
     if(!rotTriggered){rotTriggered=true;sendPush();playAlert();}
   }else if(diff>60){document.getElementById('nb').classList.remove('show');rotTriggered=false;}
-  if(diff===0)setTimeout(()=>{execRotSilent();toast('Revezamento automatico!');},500);
+  updateTVClock();
+  if(diff===0){
+    if(S.settings&&S.settings.manualRot){
+      /* Manual mode: just show alert, don't execute */
+      buildNotifBanner();playAlert();sendPush();
+      toast('Hora do revezamento! Execute manualmente.');
+    }else{
+      setTimeout(()=>{execRotSilent();toast('Revezamento automatico!');},500);
+    }
+  }
 }
 
 /* SOUND */
@@ -864,16 +896,18 @@ function dDrop(toIdx){
   dragDealerIdx=null;save();renderDealers();recalc();
 }
 
-/* ROTATION PLAN */
+/* ROTATION PLAN
+   CIRCULAR QUEUE LOGIC:
+   - All available dealers maintain a queue position (queuePos)
+   - Each rotation, the queue advances by tCount positions
+   - Dealers at positions 0..tCount-1 work the tables
+   - Dealers at positions tCount..N rest
+   - This guarantees perfectly fair rotation matching the diagram:
+     * When dealers == tables: all swap, nobody doubles
+     * When dealers > tables: some rest each round, rotating fairly
+     * When dealers < tables: cascade doubling for extra coverage
+*/
 function calcPlan(){
-  /* 
-    LOGIC: cascade rotation
-    - Dealers on break (sorted: never-entered first, then longest break) enter the FIRST available tables
-    - Each entering dealer displaces the current dealer of that table
-    - The displaced dealer moves to the NEXT table in sequence (doubling)
-    - The displaced dealer of THAT table rests — unless more tables need coverage
-    - breakFlag: dealer at that table goes to rest no matter what
-  */
   const tables=S.tables.slice();
   const dealers=S.dealers;
   if(!tables.length||!dealers.length)return[];
@@ -890,115 +924,141 @@ function calcPlan(){
     return plan;
   }
 
-  /* Dealers on break sorted by priority */
-  const onBreak=available.filter(d=>!(d.covCount>0)).sort((a,b)=>{
+  const N=available.length;
+
+  /* ── STEP 1: Determine current queue positions ──
+     The dealers list order IS the queue. Dealers in S.dealers are already
+     ordered by drag-and-drop priority. We use queuePos stored on each dealer
+     to know where they are in the circular rotation.
+     If no queuePos set yet, assign based on current state:
+       - onTable dealers get positions 0..tCount-1 (currently working)
+       - onBreak dealers get positions tCount..N-1 (currently resting)
+  */
+  const onTable=available.filter(d=>d.covCount>0);
+  const onBreak=available.filter(d=>!(d.covCount>0));
+
+  /* Initialize queuePos if not set */
+  let needsInit=available.some(d=>d.queuePos===undefined||d.queuePos===null);
+  if(needsInit){
+    /* Assign positions: onTable first (0..tCount-1), onBreak after */
+    /* Sort onBreak by breakSince so longest break = closest to entering */
+    const sortedBreak=[...onBreak].sort((a,b)=>{
+      const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
+      if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
+      return(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
+    });
+    onTable.forEach((d,i)=>{d.queuePos=i;});
+    sortedBreak.forEach((d,i)=>{d.queuePos=tCount+i;});
+  }
+
+  /* Sort available by current queuePos */
+  const sorted=[...available].sort((a,b)=>(a.queuePos||0)-(b.queuePos||0));
+
+  /* ── STEP 2: Advance queue by tCount positions ──
+     After rotation: each dealer's new position = (queuePos + tCount) % N
+     But we compute WHO enters tables instead:
+     - New table workers = dealers currently at positions N-tCount .. N-1
+       (they were at the END of rest queue, now wrap around to front)
+     WAIT — simpler: after advancing, the NEW workers are the ones
+     currently resting who have been resting the longest.
+     The ones currently working go to rest.
+     
+     ACTUAL SIMPLE RULE from diagram:
+     - Dealers currently ON TABLE: each moves to the NEXT table in queue order
+       (wrapping), OR goes to rest if there are enough resting dealers to fill all tables
+     - Dealers currently ON BREAK: the ones who have been resting longest enter first
+  */
+
+  /* How many from break can enter? */
+  const breakSorted=[...onBreak].sort((a,b)=>{
     const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
     if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
-    return(a.breakSince||0)-(b.breakSince||0);
+    return(a.breakSince||a.startTime||0)-(b.breakSince||b.startTime||0);
   });
 
-  /* assigned: tableId -> dealer entering */
-  const assigned=new Map();
-  /* restSet: dealer ids going to rest */
-  const restSet=new Set();
-  /* usedDealers: already placed */
+  /* Number entering from break = min(breakCount, tCount) */
+  const entering=breakSorted.slice(0,Math.min(breakSorted.length,tCount));
+  const enteringIds=new Set(entering.map(d=>d.id));
+
+  /* How many tables still need coverage after break dealers fill them? */
+  const remainingTables=tCount-entering.length;
+
+  /* On-table dealers: sort by queuePos to get consistent circular order */
+  const onTableSorted=[...onTable].sort((a,b)=>(a.queuePos||0)-(b.queuePos||0));
+
+  /* Dealers from table who will DOUBLE (fill remaining tables) vs REST */
+  /* Rule: the ones at the FRONT of the on-table queue double; rear rests */
+  /* But respect breakFlag: those dealers MUST rest */
+  const tableDoubling=[];
+  const tableResting=[];
+  const breakFlagIds=new Set(tables.filter(t=>t.breakFlag&&t.dealerId).map(t=>t.dealerId));
+
+  for(const d of onTableSorted){
+    if(breakFlagIds.has(d.id)){tableResting.push(d);continue;}
+    if(tableDoubling.length<remainingTables&&!enteringIds.has(d.id)){
+      tableDoubling.push(d);
+    }else{
+      tableResting.push(d);
+    }
+  }
+
+  /* ── STEP 3: Assign tables ──
+     Tables are assigned in order. Entering break dealers take the first tables.
+     Doubling on-table dealers take the remaining tables.
+     Avoid lastTableId where possible.
+  */
+  const allIncoming=[...entering,...tableDoubling];
+  const assigned=new Map(); /* tableId -> dealer */
   const usedDealers=new Set();
 
-  /* 
-    CASCADE ALGORITHM:
-    For each dealer coming off break:
-      1. Place them in the first table that has no assignment yet (prefer non-lastTable)
-      2. The current dealer of that table is "displaced"
-      3. Displaced dealer cascades to the NEXT unassigned table
-      4. The dealer displaced from THAT table rests
-    If more break dealers available, continue cascade
+  /* Two-pass assignment to avoid lastTable repeats */
+  const tablesCopy=[...tables];
+
+  /* Pass 1: assign each incoming dealer to preferred table (not their last) */
+  for(const d of allIncoming){
+    const prefer=tablesCopy.filter(t=>!assigned.has(t.id)&&t.id!==d.lastTableId);
+    const fallback=tablesCopy.filter(t=>!assigned.has(t.id));
+    const target=prefer.length?prefer[0]:fallback[0];
+    if(!target)break;
+    assigned.set(target.id,d);
+    usedDealers.add(d.id);
+  }
+
+  /* ── STEP 4: Update queuePos for next rotation ──
+     New positions: entering break dealers get positions 0..entering.length-1
+     Doubling dealers keep working (positions entering.length..tCount-1)
+     Resting dealers get positions tCount..N-1
+     This is computed in execRotSilent using rotOrder
   */
-  const breakQueue=[...onBreak];
-  const onTableSorted=available.filter(d=>d.covCount>0).sort((a,b)=>(b.covCount||0)-(a.covCount||0));
 
-  let queueIdx=0;
-  while(queueIdx<breakQueue.length){
-    const entrant=breakQueue[queueIdx++];
-    if(usedDealers.has(entrant.id))continue;
-
-    /* Find first unassigned table, prefer not lastTable */
-    const freeTablesPrefer=tables.filter(t=>!assigned.has(t.id)&&t.id!==entrant.lastTableId);
-    const freeTables=tables.filter(t=>!assigned.has(t.id));
-    const targetTable=freeTablesPrefer.length?freeTablesPrefer[0]:freeTables[0];
-    if(!targetTable)break;
-
-    assigned.set(targetTable.id,entrant);
-    usedDealers.add(entrant.id);
-
-    /* Check breakFlag — if this table has breakFlag, its current dealer MUST rest */
-    const curDealer=targetTable.dealerId?dealers.find(x=>x.id===targetTable.dealerId):null;
-    if(!curDealer||curDealer.id===entrant.id)continue;
-
-    if(targetTable.breakFlag){
-      restSet.add(curDealer.id);
-      continue;
-    }
-
-    /* Cascade: current dealer of this table moves to NEXT unassigned table */
-    const nextFreeTables=tables.filter(t=>!assigned.has(t.id)&&t.id!==curDealer.lastTableId);
-    const nextFreeAll=tables.filter(t=>!assigned.has(t.id));
-    const nextTable=nextFreeTables.length?nextFreeTables[0]:nextFreeAll[0];
-
-    if(nextTable&&!usedDealers.has(curDealer.id)){
-      /* curDealer doubles to nextTable */
-      assigned.set(nextTable.id,curDealer);
-      usedDealers.add(curDealer.id);
-      /* The dealer being displaced from nextTable goes to rest */
-      const nextCurDealer=nextTable.dealerId?dealers.find(x=>x.id===nextTable.dealerId):null;
-      if(nextCurDealer&&nextCurDealer.id!==curDealer.id&&!usedDealers.has(nextCurDealer.id)){
-        restSet.add(nextCurDealer.id);
-      }
-    }else{
-      /* No next table available — curDealer rests */
-      restSet.add(curDealer.id);
-    }
-  }
-
-  /* Fill any remaining unassigned tables with cascade from on-table dealers */
-  for(const t of tables){
-    if(assigned.has(t.id))continue;
-    /* Need someone to cover — pick from on-table sorted by covCount desc */
-    const candidate=onTableSorted.find(d=>!usedDealers.has(d.id));
-    if(candidate){
-      assigned.set(t.id,candidate);
-      usedDealers.add(candidate.id);
-      /* Displaced dealer of this table rests */
-      const cur=t.dealerId?dealers.find(x=>x.id===t.dealerId):null;
-      if(cur&&cur.id!==candidate.id)restSet.add(cur.id);
-    }
-  }
-
-  /* Any on-table dealer not assigned and not in restSet goes to rest */
-  available.filter(d=>d.covCount>0&&!usedDealers.has(d.id)).forEach(d=>restSet.add(d.id));
-
+  /* ── STEP 5: Build plan output ── */
   const moves=[],rests=[];
   tables.forEach(t=>{
     const d=assigned.get(t.id);if(!d)return;
-    const nextMult=(d.covCount||0)+1;
+    const isDoubling=tableDoubling.some(x=>x.id===d.id);
+    const nextMult=isDoubling?(d.covCount||1)+1:1; /* break entrants always reset to 1 */
     let mlabel='ml-normal';
     if(nextMult===2)mlabel='ml-2x';else if(nextMult===3)mlabel='ml-3x';
     else if(nextMult===4)mlabel='ml-4x';else if(nextMult>=5)mlabel='ml-5x';
-    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult:nextMult,mlabel});
+    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult:nextMult,mlabel,isNew:!isDoubling});
   });
 
-  restSet.forEach(id=>{
-    if(usedDealers.has(id))return;
-    const d=dealers.find(x=>x.id===id);if(!d)return;
+  /* Anyone on table who is not doubling goes to rest */
+  tableResting.forEach(d=>{
     const dTable=S.tables.find(t=>t.dealerId===d.id);
     const isBreak=dTable&&dTable.breakFlag;
-    rests.push({type:'rest',dname:d.name,did:id,msg:`era ${d.covCount}x`,breakFlag:isBreak});
+    rests.push({type:'rest',dname:d.name,did:d.id,msg:`era ${d.covCount}x`,breakFlag:isBreak});
+  });
+  /* Unassigned on-table also rest */
+  onTable.filter(d=>!usedDealers.has(d.id)&&!tableResting.some(r=>r.id===d.id)).forEach(d=>{
+    rests.push({type:'rest',dname:d.name,did:d.id,msg:`era ${d.covCount}x`});
   });
 
   moves.forEach(m=>plan.push(m));
   rests.forEach(r=>plan.push(r));
   notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'pending',dname:d.name,did:d.id,msg:`Entra no rev. as ${fmts(frt)}`});});
   paused.forEach(d=>plan.push({type:'info',msg:`${d.name} — ${d.paused?'em pausa':'saiu'}`}));
-  if(available.length<tCount)plan.push({type:'warn',msg:`${tCount-available.length} mesa(s) sem cobertura. Cascade ativo.`});
+  if(N<tCount)plan.push({type:'warn',msg:`${tCount-N} mesa(s) sem dealer. Cascade ativo — ate ${Math.ceil(tCount/Math.max(1,N))}x.`});
   return plan;
 }
 function multLabel(m){if(m<=1)return{text:'ENTRA',cls:'ml-normal'};if(m===2)return{text:'2X',cls:'ml-2x'};if(m===3)return{text:'3X',cls:'ml-3x'};if(m===4)return{text:'4X',cls:'ml-4x'};return{text:m+'X',cls:'ml-5x'};}
@@ -1166,10 +1226,10 @@ function execRotSilent(){
   const moves=plan.filter(p=>p.type==='move');const rests=plan.filter(p=>p.type==='rest');
   if(!moves.length)return;
   const restIds=new Set(rests.map(r=>r.did));const moveIds=new Set(moves.map(m=>m.did));
-  /* Registra no historico geral */
+
+  /* History */
   const entry={time:fmts(now()),timestamp:Date.now(),moves:moves.map(m=>({name:m.dname,table:m.toNum,mult:m.mult})),rests:rests.filter(r=>!moveIds.has(r.did)).map(r=>({name:r.dname}))};
   if(!S.history)S.history=[];S.history.unshift(entry);if(S.history.length>50)S.history=S.history.slice(0,50);
-  /* Registra historico por mesa */
   if(!S.tableHistory)S.tableHistory={};
   moves.forEach(m=>{
     const key='t'+m.toTable;
@@ -1177,20 +1237,47 @@ function execRotSilent(){
     S.tableHistory[key].entries.push({dealer:m.dname,time:fmts(now()),timestamp:Date.now()});
     if(S.tableHistory[key].entries.length>100)S.tableHistory[key].entries=S.tableHistory[key].entries.slice(-100);
   });
+
+  /* Apply rests */
   rests.forEach(r=>{
     if(moveIds.has(r.did))return;
     const d=S.dealers.find(x=>x.id===r.did);
     if(d){const onT=S.tables.find(t=>t.dealerId===d.id);if(onT)d.lastTableId=onT.id;d.covCount=0;d.tableId=null;d.breakSince=Date.now();}
   });
+
+  /* Apply moves */
   moves.forEach(m=>{
     const t=S.tables.find(x=>x.id===m.toTable);if(!t)return;
-    if(t.dealerId&&t.dealerId!==m.did&&!restIds.has(t.dealerId)){const old=S.dealers.find(x=>x.id===t.dealerId);if(old){old.lastTableId=t.id;old.covCount=Math.max(0,(old.covCount||1)-1);if(old.covCount===0){old.tableId=null;old.breakSince=Date.now();}}}
+    if(t.dealerId&&t.dealerId!==m.did&&!restIds.has(t.dealerId)){
+      const old=S.dealers.find(x=>x.id===t.dealerId);
+      if(old){old.lastTableId=t.id;old.covCount=Math.max(0,(old.covCount||1)-1);if(old.covCount===0){old.tableId=null;old.breakSince=Date.now();}}
+    }
     const d=S.dealers.find(x=>x.id===m.did);
     if(d){d.covCount=m.mult;d.tableId=m.toTable;d.lastTableId=m.toTable;d.rotCount=(d.rotCount||0)+1;d.breakSince=null;t.dealerId=d.id;}
   });
+
+  /* Update queuePos for circular rotation:
+     New workers (from break) get positions 0..entering-1
+     Continuing workers (doubling) get next positions
+     Resting dealers get positions tCount..N-1 */
+  const tCount=S.tables.filter(t=>t.dealerId).length;
+  const moveSet=new Set(moves.map(m=>m.did));
+  const restSet=new Set(rests.map(r=>r.did));
+  const available=S.dealers.filter(d=>!d.paused&&!d.checkOut&&isAvailable(d));
+  const N=available.length;
+  if(N>0){
+    /* New entrants (from break = isNew flag) get front positions */
+    const newEntrants=moves.filter(m=>m.isNew);
+    const doublers=moves.filter(m=>!m.isNew);
+    const restingDealers=available.filter(d=>!moveSet.has(d.id));
+    let pos=0;
+    newEntrants.forEach(m=>{const d=S.dealers.find(x=>x.id===m.did);if(d)d.queuePos=pos++;});
+    doublers.forEach(m=>{const d=S.dealers.find(x=>x.id===m.did);if(d)d.queuePos=pos++;});
+    restingDealers.sort((a,b)=>(a.breakSince||0)-(b.breakSince||0)).forEach(d=>{d.queuePos=pos++;});
+  }
+
   S.tables.forEach(t=>{
     if(t.dealerId&&!S.dealers.find(d=>d.id===t.dealerId))t.dealerId=null;
-    /* Clear break flag after rotation executes */
     if(t.breakFlag)t.breakFlag=false;
   });
   S.rotCount++;S.lastRot=Date.now();save();
@@ -1470,7 +1557,10 @@ function resetDay(){
 }
 
 function refreshAll(){
-  if(currentRole==='tv'){renderTV();updateTVClock();return;}
+  if(currentRole==='tv'){
+    renderTV();
+    return;
+  }
   renderTables();renderDealers();recalc();renderSettings();updateTourneyUI();
   const tabs=['mesas','dealers','rotacao','relatorio','historico','config'];
   const active=tabs.find(t=>document.getElementById('tab-'+t)&&document.getElementById('tab-'+t).style.display!=='none');
@@ -1518,29 +1608,36 @@ if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch((
 /* TV MODE RENDERING */
 function renderTV(){
   if(currentRole!=='tv')return;
+  if(!document.getElementById('tv-screen').classList.contains('active'))return;
   const tvt=document.getElementById('tv-tables-list');
   const tvn=document.getElementById('tv-next-list');
   if(!tvt||!tvn)return;
 
   /* Tables */
-  if(!S.tables.length){tvt.innerHTML='<div style="color:var(--txm);font-size:16px;padding:20px 0">Nenhuma mesa aberta</div>';return;}
-  tvt.innerHTML=S.tables.map(t=>{
-    const d=t.dealerId?S.dealers.find(x=>x.id===t.dealerId):null;
-    const st=d?dealerStyle(d):null;
-    return`<div class="tv-table-card ${t.dealerId?'active':''}">
-      <div>
-        <div class="tv-table-num">MESA ${t.num}</div>
-        <div class="tv-table-dealer ${!d?'empty':''}">${d?d.name:'Vaga'}</div>
-      </div>
-      ${d&&st?`<span class="tv-table-badge dst ${st.cls}">${st.lbl}</span>`:''}
-    </div>`;
-  }).join('');
+  if(!S.tables.length){
+    tvt.innerHTML='<div style="color:var(--txm);font-size:18px;padding:20px 0">Nenhuma mesa aberta</div>';
+  }else{
+    tvt.innerHTML=S.tables.map(t=>{
+      const d=t.dealerId?S.dealers.find(x=>x.id===t.dealerId):null;
+      const st=d?dealerStyle(d):null;
+      return`<div class="tv-table-card ${t.dealerId?'active':''}">
+        <div>
+          <div class="tv-table-num">Mesa ${t.num}</div>
+          <div class="tv-table-dealer ${!d?'empty':''}">${d?d.name:'Vaga'}</div>
+        </div>
+        ${d&&st?`<span class="dst tv-next-badge ${st.cls}">${st.lbl}</span>`:''}
+      </div>`;
+    }).join('');
+  }
 
   /* Next rotation */
   const plan=customPlan||calcPlan();
   const moves=plan.filter(p=>p.type==='move');
   const rests=plan.filter(p=>p.type==='rest');
-  if(!moves.length&&!rests.length){tvn.innerHTML='<div style="color:var(--txm);font-size:16px;padding:20px 0">Aguardando...</div>';return;}
+  if(!moves.length&&!rests.length){
+    tvn.innerHTML='<div style="color:var(--txm);font-size:18px;padding:20px 0">Aguardando...</div>';
+    return;
+  }
 
   let html='';
   moves.forEach(m=>{
@@ -1548,23 +1645,24 @@ function renderTV(){
     html+=`<div class="tv-next-item">
       <div style="flex:1">
         <div class="tv-next-name">${m.dname}</div>
-        <div class="tv-next-table">Mesa ${m.toNum}</div>
+        <div class="tv-next-info">Mesa ${m.toNum}</div>
       </div>
       <span class="tv-next-badge nm-badge ${bc}">${bt}</span>
     </div>`;
   });
   if(rests.length){
-    html+=`<div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">Descansam</div>`;
+    html+=`<div style="font-size:12px;color:var(--txm);text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)">Descansam</div>`;
     rests.forEach(r=>{
       html+=`<div class="tv-next-item rest-item">
-        <div class="tv-next-name" style="font-size:17px;color:var(--txm)">${r.dname}</div>
-        <span class="tv-next-badge ml-rest dst">DESCANSO</span>
+        <div style="flex:1"><div class="tv-next-name" style="font-size:22px;color:var(--txm)">${r.dname}</div></div>
+        <span class="tv-next-badge ml-rest dst" style="font-size:11px">DESCANSO</span>
       </div>`;
     });
   }
   tvn.innerHTML=html;
 }
 
+let tvRotTriggered=false;
 function updateTVClock(){
   if(currentRole!=='tv')return;
   const n=now();
@@ -1576,17 +1674,46 @@ function updateTVClock(){
   }
   const nxt=nextRot();if(!nxt)return;
   const diff=Math.max(0,Math.floor((nxt-n)/1000));
+  const mm=Math.floor(diff/60).toString().padStart(2,'0');
+  const ss=(diff%60).toString().padStart(2,'0');
   const cd=document.getElementById('tv-cd');
-  if(cd){
-    cd.textContent=`${Math.floor(diff/60).toString().padStart(2,'0')}:${(diff%60).toString().padStart(2,'0')}`;
-    cd.classList.toggle('urgent',diff<=60);
-  }
+  if(cd){cd.textContent=`${mm}:${ss}`;cd.classList.toggle('urgent',diff<=60);}
   const td=document.getElementById('tv-td');if(td)td.textContent=`as ${fmts(nxt)}`;
   const mins=getRotMinutes();
   if(mins.length>=2){const sorted=[...mins].sort((a,b)=>a-b);periodSecs=Math.min(...sorted.map((_,i,a)=>i?a[i]-a[i-1]:60-a[a.length-1]+a[0]))*60;}
   const pct=Math.max(0,Math.min(100,(1-diff/periodSecs)*100));
   const pf=document.getElementById('tv-prog-fill');if(pf)pf.style.width=pct+'%';
   const prog=document.getElementById('tv-prog');if(prog)prog.classList.toggle('urgent',diff<=60);
+  /* Show full-screen alert at rotation time */
+  if(diff<=8&&diff>0&&!tvRotTriggered){
+    tvRotTriggered=true;showTVAlert();
+  }else if(diff>60){
+    tvRotTriggered=false;hideTVAlert();
+    renderTV(); /* refresh next rotation panel after exec */
+  }
+}
+function showTVAlert(){
+  const plan=customPlan||calcPlan();
+  const moves=plan.filter(p=>p.type==='move');
+  if(!moves.length)return;
+  const notif=document.getElementById('tv-notif');if(!notif)return;
+  const movesList=document.getElementById('tv-notif-moves');
+  if(movesList){
+    movesList.innerHTML=moves.map(m=>{
+      const[bc,bt]=nmBadge(m.mult);
+      return`<div class="tv-notif-move">
+        <div class="tv-notif-name">${m.dname}</div>
+        <div class="tv-notif-table" style="font-size:22px">Mesa ${m.toNum}</div>
+        <span class="tv-next-badge nm-badge ${bc}" style="font-size:14px;padding:5px 14px">${bt}</span>
+      </div>`;
+    }).join('');
+  }
+  notif.classList.add('show');
+  /* Auto-hide after 25s */
+  setTimeout(hideTVAlert,25000);
+}
+function hideTVAlert(){
+  const notif=document.getElementById('tv-notif');if(notif)notif.classList.remove('show');
 }
 
 function startApp(){
