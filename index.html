@@ -958,20 +958,20 @@ function calcPlan(){
   const usedDealers=new Set();
 
   /*
-    ALGORITHM: for each break dealer in priority order,
-    trigger ONE cascade chain:
-      breakDealer → table[i]
-      table[i].curDealer → table[i+1]  (next table in sequence)
-      table[i+1].curDealer → rest
-    If table[i] has breakFlag, its dealer goes straight to rest (no cascade).
+    ALGORITHM:
+    - breakCount = how many dealers are coming off break
+    - If breakCount >= tCount: every table gets a fresh dealer, ALL on-table rest. No cascade.
+    - If breakCount < tCount: fill what we can from break, then cascade for remaining tables.
+      Each break dealer entering displaces the current dealer to the NEXT table,
+      and THAT table's dealer rests. One cascade step per break entrant.
   */
+  const breakCount=breakSorted.length;
+  const needCascade=breakCount<tCount;
+
   for(const entrant of breakSorted){
     if(usedDealers.has(entrant.id))continue;
 
-    /* Find best table for this entrant coming off break:
-       - They should go to the table AFTER their lastTableId in sequence
-       - This ensures: Mesa1 → Mesa2(double) → rest → Mesa3 next time
-       - If lastTableId not found or no next table, use first free table */
+    /* Find target table: next after lastTableId in circular order */
     const freeTables=tables.filter(t=>!assigned.has(t.id));
     if(!freeTables.length)break;
 
@@ -979,38 +979,33 @@ function calcPlan(){
     if(entrant.lastTableId){
       const lastIdx=tables.findIndex(t=>t.id===entrant.lastTableId);
       if(lastIdx>=0){
-        /* Look for next free table AFTER lastTableId in circular order */
         for(let offset=1;offset<=tables.length;offset++){
           const candidate=tables[(lastIdx+offset)%tables.length];
           if(!assigned.has(candidate.id)){targetTable=candidate;break;}
         }
       }
     }
-    /* Fallback: first free table */
     if(!targetTable)targetTable=freeTables[0];
     if(!targetTable)break;
 
-    /* Place entrant at this table */
     assigned.set(targetTable.id,entrant);
     usedDealers.add(entrant.id);
 
     const displaced=tableDealer.get(targetTable.id);
     if(!displaced||displaced.id===entrant.id)continue;
 
-    /* breakFlag: displaced dealer must rest */
-    if(targetTable.breakFlag||breakFlagIds.has(displaced.id)){
+    /* If enough break dealers to cover all tables, displaced dealer simply rests */
+    if(!needCascade||targetTable.breakFlag||breakFlagIds.has(displaced.id)){
       restSet.add(displaced.id);
       continue;
     }
 
-    /* Cascade: displaced dealer goes to NEXT table in sequence */
+    /* CASCADE: displaced dealer goes to NEXT table (only when not enough break dealers) */
     const targetIdx=tables.findIndex(t=>t.id===targetTable.id);
-    /* Find next table after targetIdx that is unassigned */
     let cascadeTable=null;
     for(let i=targetIdx+1;i<tables.length;i++){
       if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}
     }
-    /* If no next table found, search from beginning */
     if(!cascadeTable){
       for(let i=0;i<targetIdx;i++){
         if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}
@@ -1018,45 +1013,43 @@ function calcPlan(){
     }
 
     if(cascadeTable&&!usedDealers.has(displaced.id)){
-      /* Displaced dealer doubles to cascade table */
       assigned.set(cascadeTable.id,displaced);
       usedDealers.add(displaced.id);
-      /* The dealer at cascade table goes to rest */
       const displaced2=tableDealer.get(cascadeTable.id);
       if(displaced2&&displaced2.id!==displaced.id&&!usedDealers.has(displaced2.id)){
         restSet.add(displaced2.id);
       }
     }else{
-      /* No next table — displaced rests */
       restSet.add(displaced.id);
     }
   }
 
-  /* Dealers not touched by cascade: they need to ADVANCE to next table too.
-     If their next table is already taken, they stay. If free, they move.
-     This ensures nobody stays on the same table indefinitely. */
+  /* Untouched on-table dealers:
+     - If no cascade needed (enough break dealers): all rest
+     - If cascade needed: advance to next free table or stay */
   const untouched=onTable.filter(d=>!usedDealers.has(d.id)&&!restSet.has(d.id));
   for(const d of untouched){
+    if(!needCascade){
+      /* Enough break dealers — everyone on table rests */
+      restSet.add(d.id);
+      continue;
+    }
     const curTable=S.tables.find(x=>x.dealerId===d.id);
     if(!curTable)continue;
     const curIdx=tables.findIndex(t=>t.id===curTable.id);
-    /* Try to find next free table after current */
     let nextTable=null;
     for(let offset=1;offset<=tables.length;offset++){
       const candidate=tables[(curIdx+offset)%tables.length];
       if(!assigned.has(candidate.id)){nextTable=candidate;break;}
     }
     if(nextTable&&nextTable.id!==curTable.id){
-      /* Move to next table — but first check if the dealer at nextTable needs to cascade */
       const nextCur=tableDealer.get(nextTable.id);
       if(nextCur&&nextCur.id!==d.id&&!usedDealers.has(nextCur.id)){
-        /* nextCur gets displaced — they rest */
         restSet.add(nextCur.id);
       }
       assigned.set(nextTable.id,d);
       usedDealers.add(d.id);
     }else{
-      /* No next table free — stay on current table */
       if(curTable&&!assigned.has(curTable.id)){
         assigned.set(curTable.id,d);usedDealers.add(d.id);
       }
