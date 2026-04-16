@@ -534,9 +534,12 @@ function startRealtimeSync(){
       lastRot:raw.lastRot||null,
       history:raw.history?Object.values(raw.history):[],
       settings:raw.settings||{sound:true,rotMinutes:[23,53],tourneyStarted:false},
-      tableHistory:raw.tableHistory||{}
+      tableHistory:raw.tableHistory||{},
+      customPlan:raw.customPlan||null
     };
     if(!S.settings.rotMinutes||!S.settings.rotMinutes.length)S.settings.rotMinutes=[23,53];
+    /* Sync customPlan to local JS variable — all devices (TV included) use it */
+    customPlan=S.customPlan||null;
     catchUpMissedRotations();refreshAll();
   },err=>{setSyncStatus('err');showSyncError('Erro: '+err.message);});
   unsubscribe=()=>ref.off('value',handler);
@@ -738,6 +741,8 @@ function addTable(){
     d.covCount=1;d.tableId=newTable.id;d.lastTableId=newTable.id;
     d.rotCount=(d.rotCount||0)+1;d.breakSince=null;
     newTable.dealerId=d.id;
+    /* Reset all queuePos since the table count changed — calcPlan will re-init */
+    S.dealers.filter(x=>isAvailable(x)&&!x.paused&&!x.checkOut).forEach(x=>{x.queuePos=null;});
     toast(`Mesa ${num} aberta — ${d.name} alocado`);
   }else{
     toast(`Mesa ${num} aberta`);
@@ -749,6 +754,8 @@ function removeTable(id){
   const t=S.tables.find(x=>x.id===id);if(!t)return;
   if(t.dealerId){const d=S.dealers.find(x=>x.id===t.dealerId);if(d){d.covCount=Math.max(0,(d.covCount||1)-1);if(d.covCount===0)d.tableId=null;}t.dealerId=null;}
   S.tables=S.tables.filter(x=>x.id!==id);
+  /* Reset queuePos since table count changed */
+  S.dealers.filter(d=>isAvailable(d)&&!d.paused&&!d.checkOut).forEach(d=>{d.queuePos=null;});
   save();renderTables();renderDealers();recalc();toast('Mesa fechada');
 }
 function editTableNum(id,val){
@@ -820,8 +827,10 @@ function addDealer(){
   const ni=document.getElementById('dni'),ti=document.getElementById('dti');
   const name=ni.value.trim();if(!name){toast('Digite o nome do dealer');return;}
   const t=ti.value||now().toTimeString().slice(0,5);
-  S.dealers.push({id:Date.now(),name,startTime:parseT(t).getTime(),color:COLORS[S.dealers.length%COLORS.length],covCount:0,tableId:null,rotCount:0,breakSince:Date.now(),lastTableId:null,paused:false,checkOut:null});
-  ni.value='';ti.value='';save();renderDealers();toast(`${name} adicionado`);
+  S.dealers.push({id:Date.now(),name,startTime:parseT(t).getTime(),color:COLORS[S.dealers.length%COLORS.length],covCount:0,tableId:null,rotCount:0,breakSince:Date.now(),lastTableId:null,paused:false,checkOut:null,queuePos:null});
+  /* Reset all queuePos since dealer count changed */
+  S.dealers.filter(d=>isAvailable(d)&&!d.paused&&!d.checkOut).forEach(d=>{d.queuePos=null;});
+  ni.value='';ti.value='';save();renderDealers();recalc();toast(`${name} adicionado`);
 }
 function removeDealer(id){
   if(currentRole!=='floor')return;
@@ -1118,6 +1127,9 @@ function saveEditedRot(){
   const btn=document.getElementById('btn-edit-rot');if(btn)btn.textContent='Editar';
   // Render the customPlan
   if(customPlan)renderRotPlan(customPlan);
+  // ── Persist customPlan to Firebase so TV and all devices see it ──
+  S.customPlan=customPlan;
+  save();
   toast('Rotacao salva! Clique em Executar para aplicar.');
 }
 
@@ -1138,7 +1150,7 @@ function recalc(){
   }
 }
 function clearAndRecalc(){
-  customPlan=null;
+  customPlan=null;S.customPlan=null;save();
   renderRotPlan(calcPlan());
   toast('Plano recalculado automaticamente');
 }
@@ -1146,7 +1158,7 @@ function clearAndRecalc(){
 function execRot(){
   if(currentRole!=='floor')return;
   execRotSilent();
-  customPlan=null; // clear any manual edit after executing
+  customPlan=null;S.customPlan=null; // clear manual edit after executing, sync to Firebase
   editMode=false;
   const editor=document.getElementById('rot-editor');if(editor)editor.style.display='none';
   const rpb=document.getElementById('rpb');if(rpb)rpb.style.display='block';
@@ -1531,7 +1543,26 @@ function reqNotif(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&document.getElementById('app').style.display!=='none')catchUpMissedRotations();});
 window.addEventListener('online',()=>document.getElementById('offbar').classList.remove('show'));
 window.addEventListener('offline',()=>document.getElementById('offbar').classList.add('show'));
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    /* Check for updates every 60s */
+    setInterval(()=>reg.update(),60000);
+    /* When a new SW is waiting, send SKIP_WAITING and reload */
+    reg.addEventListener('updatefound',()=>{
+      const newSW=reg.installing;
+      newSW.addEventListener('statechange',()=>{
+        if(newSW.state==='installed'&&navigator.serviceWorker.controller){
+          newSW.postMessage({type:'SKIP_WAITING'});
+        }
+      });
+    });
+  }).catch(()=>{});
+  /* Reload page when new SW takes control */
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!refreshing){refreshing=true;window.location.reload();}
+  });
+}
 
 /* TV MODE RENDERING */
 function renderTV(){
