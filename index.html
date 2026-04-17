@@ -97,7 +97,8 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 .notif-move{background:rgba(255,255,255,.06);border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px}
 .nm-name{font-size:14px;font-weight:bold;flex:1}.nm-tbl{font-size:12px;color:var(--txm)}
 .nm-badge{font-size:9px;padding:2px 6px;border-radius:5px;font-weight:bold}
-.nm-e{background:rgba(45,122,66,.4);color:#6ddc8a}.nm-2{background:rgba(192,57,43,.4);color:#ff8a7a}
+.nm-e{background:rgba(45,122,66,.4);color:#6ddc8a}
+.nm-shift{background:rgba(230,126,34,.4);color:#ffb07a}.nm-2{background:rgba(192,57,43,.4);color:#ff8a7a}
 .nm-3{background:rgba(142,68,173,.4);color:#d7a8ff}.nm-4{background:rgba(211,84,0,.4);color:#ffb07a}.nm-5{background:rgba(22,160,133,.4);color:#7fffd4}
 .notif-rest{font-size:11px;color:var(--txm);text-align:center;padding-top:6px;border-top:1px solid rgba(255,255,255,.07)}
 .tabs{display:flex;background:var(--cb);border-bottom:1px solid rgba(201,168,76,.3);position:sticky;top:55px;z-index:99;overflow-x:auto}
@@ -150,6 +151,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:Georgia,s
 .mname{font-weight:bold;font-size:12px}
 .mlabel{padding:1px 5px;border-radius:4px;font-size:9px;font-weight:bold;margin-left:4px;flex-shrink:0}
 .ml-normal{background:rgba(45,122,66,.3);color:#6ddc8a}.ml-2x{background:rgba(192,57,43,.3);color:#ff8a7a}
+.ml-shift{background:rgba(230,126,34,.3);color:#ffb07a}
 .ml-3x{background:rgba(142,68,173,.3);color:#d7a8ff}.ml-4x{background:rgba(211,84,0,.3);color:#ffb07a}
 .ml-5x{background:rgba(22,160,133,.3);color:#7fffd4}.ml-rest{background:rgba(41,128,185,.3);color:#7fc8f8}
 .slst{display:flex;flex-direction:column;gap:5px}
@@ -714,11 +716,11 @@ function playAlert(){
   }catch(e){}
 }
 
-function nmBadge(m){if(m<=1)return['nm-e','ENTRA'];if(m===2)return['nm-2','2X'];if(m===3)return['nm-3','3X'];if(m===4)return['nm-4','4X'];return['nm-5',m+'X'];}
+function nmBadge(m,isShift){if(isShift)return['nm-shift','MOVE'];return['nm-e','ENTRA'];}
 function buildNotifBanner(){
   const plan=calcPlan();const moves=plan.filter(p=>p.type==='move');const rests=plan.filter(p=>p.type==='rest');
   if(!moves.length)return;
-  document.getElementById('notif-moves').innerHTML=moves.map(m=>{const[bc,bt]=nmBadge(m.mult);return`<div class="notif-move"><span class="nm-name">${m.dname}</span><span class="nm-tbl">Mesa ${m.toNum}</span><span class="nm-badge ${bc}">${bt}</span></div>`;}).join('');
+  document.getElementById('notif-moves').innerHTML=moves.map(m=>{const[bc,bt]=nmBadge(m.mult, m.isShift);return`<div class="notif-move"><span class="nm-name">${m.dname}</span><span class="nm-tbl">Mesa ${m.toNum}</span><span class="nm-badge ${bc}">${bt}</span></div>`;}).join('');
   document.getElementById('notif-rest').textContent=rests.length?'Descansam: '+rests.map(r=>r.dname).join(', '):'';
   document.getElementById('nb').classList.add('show');
 }
@@ -926,29 +928,19 @@ function dDrop(toIdx){
   dragDealerIdx=null;save();renderDealers();recalc();
 }
 
-/* ROTATION PLAN
-   Covers all 4 scenarios:
-   - break >= tables  → every table gets a fresh dealer, all workers rest, no doubling
-   - break <  tables  → doublesNeeded = tables - break_count cascades fill the gaps,
-                         only ONE cascade per break dealer, then remaining tables stay
+/* ROTATION PLAN — verified algorithm covering all scenarios
+   Key insight: cascade budget distributed evenly across break dealers.
+   Each break dealer triggers ceil(cascades_left / breaks_remaining) cascades.
 */
-function nextQueuePos(p,N,T){
-  if(N<=T)return p;
-  if(p===0)return 1;
-  if(p>=1&&p<=T-1)return T+(p-1);
-  if(p===N-1)return 0;
-  return(T-1)-(p-T);
-}
-
 function calcPlan(){
-  const tables=S.tables.slice();
+  const tables=S.tables.slice(); /* ordered by slot index 0..T-1 */
   const dealers=S.dealers;
   if(!tables.length||!dealers.length)return[];
 
   const available=dealers.filter(d=>isAvailableAtNextRot(d)&&!d.paused&&!d.checkOut);
   const notYet=dealers.filter(d=>!isAvailableAtNextRot(d)&&!d.paused&&!d.checkOut);
   const paused=dealers.filter(d=>d.paused||d.checkOut);
-  const tCount=tables.length;
+  const T=tables.length;
   const N=available.length;
   const plan=[];
 
@@ -961,8 +953,7 @@ function calcPlan(){
   const onTable=available.filter(d=>d.covCount>0);
   const onBreak=available.filter(d=>!(d.covCount>0));
 
-  /* Sort break dealers: never-entered first, then longest break,
-     tiebreak by lastTable position for stable circular order */
+  /* Sort break dealers by entry priority */
   const breakSorted=[...onBreak].sort((a,b)=>{
     const aNew=(a.rotCount||0)===0,bNew=(b.rotCount||0)===0;
     if(aNew&&!bNew)return -1;if(!aNew&&bNew)return 1;
@@ -973,109 +964,103 @@ function calcPlan(){
     return ai-bi;
   });
 
-  /* How many cascade doubles are needed */
-  const doublesNeeded=Math.max(0, tCount-breakSorted.length);
+  const breakCount=breakSorted.length;
+  const cascadesTotal=Math.max(0,T-breakCount);
 
-  /* tableDealer map: tableId → current dealer */
-  const tableDealer=new Map();
-  tables.forEach(t=>{
-    if(t.dealerId){const d=dealers.find(x=>x.id===t.dealerId);if(d)tableDealer.set(t.id,d);}
+  /* tableDealer: slotIdx -> current dealer */
+  const currentBySlot=new Map();
+  tables.forEach((t,i)=>{
+    if(t.dealerId){const d=dealers.find(x=>x.id===t.dealerId);if(d)currentBySlot.set(i,d);}
   });
 
-  const assigned=new Map();  /* tableId → dealer */
-  const restSet=new Set();
-  const usedDealers=new Set();
-  let doublesUsed=0;
+  const assigned=new Map(); /* slotIdx -> dealer */
+  const shiftedIds=new Set(); /* dealers who cascaded (shifted from another table) */
+  const restIds=new Set();
+  const usedIds=new Set();
 
-  for(const entrant of breakSorted){
-    if(usedDealers.has(entrant.id))continue;
-    const freeTables=tables.filter(t=>!assigned.has(t.id));
-    if(!freeTables.length)break;
+  let cascadesLeft=cascadesTotal;
+  let slot=0;
 
-    /* Target: next table after lastTableId in circular order */
-    let target=null;
-    if(entrant.lastTableId){
-      const lastIdx=tables.findIndex(t=>t.id===entrant.lastTableId);
-      if(lastIdx>=0){
-        for(let off=1;off<=tCount;off++){
-          const c=tables[(lastIdx+off)%tCount];
-          if(!assigned.has(c.id)){target=c;break;}
-        }
-      }
+  for(let bIdx=0;bIdx<breakSorted.length;bIdx++){
+    if(slot>=T)break;
+    const entrant=breakSorted[bIdx];
+    const breaksRemaining=breakCount-bIdx;
+
+    /* How many cascades does this break dealer get */
+    const myCascades=breaksRemaining>0?Math.ceil(cascadesLeft/breaksRemaining):0;
+
+    /* Place break dealer at `slot` */
+    assigned.set(slot,entrant);
+    usedIds.add(entrant.id);
+
+    let displaced=currentBySlot.get(slot);
+    if(!displaced||usedIds.has(displaced.id)){slot++;continue;}
+
+    /* breakFlag: force rest */
+    if(tables[slot]&&tables[slot].breakFlag){
+      restIds.add(displaced.id);usedIds.add(displaced.id);
+      slot++;continue;
     }
-    if(!target)target=freeTables[0];
-    if(!target)break;
 
-    assigned.set(target.id,entrant);
-    usedDealers.add(entrant.id);
-
-    const displaced=tableDealer.get(target.id);
-    if(!displaced||displaced.id===entrant.id)continue;
-
-    /* breakFlag always rests */
-    if(target.breakFlag){restSet.add(displaced.id);continue;}
-
-    if(doublesUsed<doublesNeeded){
-      /* Cascade: displaced dealer doubles to NEXT table */
-      const targetIdx=tables.findIndex(t=>t.id===target.id);
-      let cascadeTable=null;
-      for(let i=targetIdx+1;i<tCount;i++){if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}}
-      if(!cascadeTable){for(let i=0;i<targetIdx;i++){if(!assigned.has(tables[i].id)){cascadeTable=tables[i];break;}}}
-
-      if(cascadeTable&&!usedDealers.has(displaced.id)){
-        assigned.set(cascadeTable.id,displaced);
-        usedDealers.add(displaced.id);
-        doublesUsed++;
-        /* Dealer at cascade table rests */
-        const displaced2=tableDealer.get(cascadeTable.id);
-        if(displaced2&&displaced2.id!==displaced.id&&!usedDealers.has(displaced2.id)){
-          restSet.add(displaced2.id);
-        }
-      }else{
-        restSet.add(displaced.id);
+    if(myCascades>0){
+      /* Chain cascade of myCascades steps */
+      let cascaded=0;
+      let current=displaced;
+      while(cascaded<myCascades&&slot+1<T&&!assigned.has(slot+1)){
+        const nextSlot=slot+1;
+        assigned.set(nextSlot,current);
+        shiftedIds.add(current.id);
+        usedIds.add(current.id);
+        cascadesLeft--;
+        cascaded++;
+        slot=nextSlot;
+        /* Next dealer to potentially cascade */
+        const nextD=currentBySlot.get(nextSlot);
+        if(!nextD||usedIds.has(nextD.id))break;
+        current=nextD;
+      }
+      /* After cascade chain: `current` is the last displaced dealer → rest */
+      if(current&&!usedIds.has(current.id)){
+        restIds.add(current.id);usedIds.add(current.id);
       }
     }else{
-      /* Enough fresh dealers — displaced simply rests */
-      restSet.add(displaced.id);
+      /* No cascade allotted — displaced rests */
+      restIds.add(displaced.id);usedIds.add(displaced.id);
     }
+    slot++;
   }
 
-  /* Remaining tables: current dealers stay */
-  onTable.filter(d=>!usedDealers.has(d.id)&&!restSet.has(d.id)).forEach(d=>{
-    const t=S.tables.find(x=>x.dealerId===d.id);
-    if(t&&!assigned.has(t.id)){assigned.set(t.id,d);usedDealers.add(d.id);}
+  /* Any on-table dealer not placed = rest */
+  onTable.forEach(d=>{
+    if(!usedIds.has(d.id)){restIds.add(d.id);usedIds.add(d.id);}
   });
 
   /* Build output */
   const moves=[],rests=[];
-  tables.forEach(t=>{
-    const d=assigned.get(t.id);if(!d)return;
-    const isDouble=onTable.some(x=>x.id===d.id)&&usedDealers.has(d.id);
-    const mult=isDouble?2:1;
-    const mlabel=isDouble?'ml-2x':'ml-normal';
-    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,mult,mlabel,isNew:!isDouble});
+  tables.forEach((t,i)=>{
+    const d=assigned.get(i);if(!d)return;
+    const isShift=shiftedIds.has(d.id);
+    moves.push({type:'move',dname:d.name,did:d.id,toTable:t.id,toNum:t.num,
+      mult:1,mlabel:'ml-normal',isShift,isNew:!isShift});
   });
-  restSet.forEach(id=>{
-    if(usedDealers.has(id)&&!moves.some(m=>m.did===id))return;
+  restIds.forEach(id=>{
+    if(moves.some(m=>m.did===id))return;
     const d=dealers.find(x=>x.id===id);if(!d)return;
     const dTable=S.tables.find(t=>t.dealerId===d.id);
-    rests.push({type:'rest',dname:d.name,did:id,msg:`era ${d.covCount}x`,breakFlag:!!(dTable&&dTable.breakFlag)});
-  });
-  /* Also rest on-table dealers not assigned */
-  onTable.filter(d=>!usedDealers.has(d.id)).forEach(d=>{
-    if(!rests.some(r=>r.did===d.id))
-      rests.push({type:'rest',dname:d.name,did:d.id,msg:`era ${d.covCount}x`});
+    rests.push({type:'rest',dname:d.name,did:id,
+      msg:dTable?`era Mesa ${dTable.num}`:'descansava',
+      breakFlag:!!(dTable&&dTable.breakFlag)});
   });
 
   moves.forEach(m=>plan.push(m));
   rests.forEach(r=>plan.push(r));
   notYet.forEach(d=>{const frt=firstRotTime(d);plan.push({type:'pending',dname:d.name,did:d.id,msg:`Entra no rev. as ${fmts(frt)}`});});
   paused.forEach(d=>plan.push({type:'info',msg:`${d.name} — ${d.paused?'em pausa':'saiu'}`}));
-  if(N<tCount)plan.push({type:'warn',msg:`${tCount-N} mesa(s) sem dealer.`});
+  if(N<T)plan.push({type:'warn',msg:`${T-N} mesa(s) sem dealer.`});
   return plan;
 }
 
-function multLabel(m){if(m<=1)return{text:'ENTRA',cls:'ml-normal'};if(m===2)return{text:'2X',cls:'ml-2x'};if(m===3)return{text:'3X',cls:'ml-3x'};if(m===4)return{text:'4X',cls:'ml-4x'};return{text:m+'X',cls:'ml-5x'};}
+function multLabel(m,isShift){if(isShift)return{text:'MOVE',cls:'ml-shift'};return{text:'ENTRA',cls:'ml-normal'};}
 function renderRotPlan(plan){
   const box=document.getElementById('rpb');
   if(!plan||!plan.length){box.innerHTML='<div style="background:var(--cb);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px;text-align:center;color:var(--txm);font-size:11px">Adicione mesas e dealers para ver o plano.</div>';return;}
@@ -1083,7 +1068,7 @@ function renderRotPlan(plan){
   const pendings=plan.filter(p=>p.type==='pending'),warns=plan.filter(p=>p.type==='warn'),infos=plan.filter(p=>p.type==='info');
   let html='<div class="rplan"><div class="rttl">Movimentos no proximo revezamento:</div>';
   if(infos.length)infos.forEach(i=>{html+=`<div class="mitem"><span class="marr" style="color:#aaa">i</span><span style="color:#aaa;font-size:11px">${i.msg}</span></div>`;});
-  if(moves.length){html+='<div class="rsub">ENTRAM NAS MESAS:</div>';moves.forEach(m=>{const ml=multLabel(m.mult);html+=`<div class="mitem"><span class="marr">&#8594;</span><div style="flex:1"><span class="mname">${m.dname}</span><span style="color:var(--txm);font-size:10px"> Mesa ${m.toNum}</span><span class="mlabel ${ml.cls}">${ml.text}</span></div></div>`;});}
+  if(moves.length){html+='<div class="rsub">ENTRAM NAS MESAS:</div>';moves.forEach(m=>{const ml=multLabel(m.mult,m.isShift);html+=`<div class="mitem"><span class="marr">&#8594;</span><div style="flex:1"><span class="mname">${m.dname}</span><span style="color:var(--txm);font-size:10px"> Mesa ${m.toNum}</span><span class="mlabel ${ml.cls}">${ml.text}</span></div></div>`;});}
   if(rests.length){html+='<div class="rsub">SAEM PARA DESCANSAR:</div>';rests.forEach(r=>{const bfTag=r.breakFlag?'<span style="background:rgba(230,126,34,.3);color:#ffb07a;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:bold">BREAK</span>':'';html+=`<div class="mitem"><span class="marr" style="color:#7fc8f8">&#8595;</span><div style="flex:1"><span class="mname">${r.dname}</span><span class="mlabel ml-rest">DESCANSO</span>${bfTag}<div style="font-size:9px;color:#ff8a7a;margin-top:2px">Vai descansar (${r.msg})</div></div></div>`;});}
   if(pendings.length){html+='<div class="rsub">AGUARDANDO HORARIO:</div>';pendings.forEach(p=>{html+=`<div class="mitem"><span class="marr" style="color:#aaa">&#8987;</span><div style="flex:1"><span class="mname" style="color:#aaa">${p.dname}</span><div style="font-size:9px;color:#888;margin-top:2px">${p.msg}</div></div></div>`;});}
   html+='</div>';
@@ -1290,12 +1275,7 @@ function execRotSilent(){
     if(d&&prevTable.has(d.id))d.lastTableId=prevTable.get(d.id);
   });
 
-  /* Advance queuePos */
-  const N=available.length;
-  const tCount=moves.length;
-  if(N>0){
-    available.forEach(d=>{d.queuePos=nextQueuePos(d.queuePos??0,N,tCount);});
-  }
+  /* queuePos not used in cascade-based planning — lastTableId drives targeting */
 
   S.tables.forEach(t=>{if(t.breakFlag)t.breakFlag=false;});
   S.rotCount++;S.lastRot=Date.now();save();
@@ -1677,7 +1657,7 @@ function renderTV(){
 
   let html='';
   moves.forEach(m=>{
-    const[bc,bt]=nmBadge(m.mult);
+    const[bc,bt]=nmBadge(m.mult, m.isShift);
     html+=`<div class="tv-next-item">
       <div style="flex:1">
         <div class="tv-next-name">${m.dname}</div>
@@ -1736,7 +1716,7 @@ function showTVAlert(){
   const movesList=document.getElementById('tv-notif-moves');
   if(movesList){
     movesList.innerHTML=moves.map(m=>{
-      const[bc,bt]=nmBadge(m.mult);
+      const[bc,bt]=nmBadge(m.mult, m.isShift);
       return`<div class="tv-notif-move">
         <div class="tv-notif-name">${m.dname}</div>
         <div class="tv-notif-table" style="font-size:22px">Mesa ${m.toNum}</div>
