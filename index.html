@@ -515,7 +515,16 @@ let S={tables:[],dealers:[],rotCount:0,lastRot:null,history:[],settings:{sound:t
 
 function save(){
   if(!db)return;setSyncStatus('syncing');
-  db.ref('tournament/state').set(S).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+  /* Save state without customPlan (stored separately) */
+  const payload={...S};
+  delete payload.customPlan;
+  delete payload.customPlanJson;
+  db.ref('tournament/state').set(payload).then(()=>setSyncStatus('ok')).catch(()=>setSyncStatus('err'));
+}
+function saveCustomPlan(plan){
+  if(!db)return;
+  /* Store customPlan in a dedicated Firebase ref as JSON string */
+  db.ref('tournament/customPlan').set(plan?JSON.stringify(plan):null);
 }
 function setSyncStatus(s){const d=document.getElementById('sync-dot');if(d)d.className='sync-dot '+s;}
 
@@ -535,14 +544,26 @@ function startRealtimeSync(){
       history:raw.history?Object.values(raw.history):[],
       settings:raw.settings||{sound:true,rotMinutes:[23,53],tourneyStarted:false},
       tableHistory:raw.tableHistory||{},
-      customPlan:raw.customPlan||null
+      customPlan:null
     };
     if(!S.settings.rotMinutes||!S.settings.rotMinutes.length)S.settings.rotMinutes=[23,53];
-    /* Sync customPlan to local JS variable — all devices (TV included) use it */
-    customPlan=S.customPlan||null;
+    /* customPlan is loaded via its own dedicated listener below */
     catchUpMissedRotations();refreshAll();
   },err=>{setSyncStatus('err');showSyncError('Erro: '+err.message);});
   unsubscribe=()=>ref.off('value',handler);
+
+  /* Listen for customPlan changes on dedicated path */
+  db.ref('tournament/customPlan').on('value',snap=>{
+    if(!snap.exists()){customPlan=null;S.customPlan=null;}
+    else{
+      try{customPlan=snap.val()?JSON.parse(snap.val()):null;}catch(e){customPlan=null;}
+      S.customPlan=customPlan;
+    }
+    /* Refresh UI on all devices */
+    if(currentRole==='tv'){renderTV();}
+    else{recalc();}
+  });
+
   /* Listen for push triggers written by any floor device */
   let lastPushTs=0;
   db.ref('push_trigger').on('value',snap=>{
@@ -1127,9 +1148,8 @@ function saveEditedRot(){
   const btn=document.getElementById('btn-edit-rot');if(btn)btn.textContent='Editar';
   // Render the customPlan
   if(customPlan)renderRotPlan(customPlan);
-  // ── Persist customPlan to Firebase so TV and all devices see it ──
-  S.customPlan=customPlan;
-  save();
+  /* Save to dedicated Firebase path — TV picks it up via listener */
+  saveCustomPlan(customPlan);
   toast('Rotacao salva! Clique em Executar para aplicar.');
 }
 
@@ -1144,21 +1164,22 @@ function reDrop(toIdx){
 }
 
 function recalc(){
+  if(currentRole==='tv'){renderTV();return;}
   if(!editMode){
     if(!customPlan){renderRotPlan(calcPlan());}
     else{renderRotPlan(customPlan);}
   }
 }
 function clearAndRecalc(){
-  customPlan=null;S.customPlan=null;save();
+  customPlan=null;saveCustomPlan(null);
   renderRotPlan(calcPlan());
-  toast('Plano recalculado automaticamente');
+  toast('Plano recalculado');
 }
 
 function execRot(){
   if(currentRole!=='floor')return;
   execRotSilent();
-  customPlan=null;S.customPlan=null; // clear manual edit after executing, sync to Firebase
+  customPlan=null;saveCustomPlan(null);
   editMode=false;
   const editor=document.getElementById('rot-editor');if(editor)editor.style.display='none';
   const rpb=document.getElementById('rpb');if(rpb)rpb.style.display='block';
