@@ -979,55 +979,68 @@ function calcPlan(){
   const usedIds=new Set();
 
   let cascadesLeft=cascadesTotal;
-  let slot=0;
 
+  /* Each break dealer picks their PREFERRED slot: (lastSlot + 1) % T
+     This ensures circular advancement — after resting, they resume at the
+     NEXT table, not always Mesa 1. */
   for(let bIdx=0;bIdx<breakSorted.length;bIdx++){
-    if(slot>=T)break;
     const entrant=breakSorted[bIdx];
     const breaksRemaining=breakCount-bIdx;
-
-    /* How many cascades does this break dealer get */
     const myCascades=breaksRemaining>0?Math.ceil(cascadesLeft/breaksRemaining):0;
 
-    /* Place break dealer at `slot` */
-    assigned.set(slot,entrant);
+    /* Find preferred slot: slot right after their lastTableId */
+    let preferred=0;
+    if(entrant.lastTableId){
+      const lastSlot=tables.findIndex(t=>t.id===entrant.lastTableId);
+      if(lastSlot>=0)preferred=(lastSlot+1)%T;
+    }
+
+    /* Find next free slot starting from preferred (circular) */
+    let target=null;
+    for(let off=0;off<T;off++){
+      const c=(preferred+off)%T;
+      if(!assigned.has(c)){target=c;break;}
+    }
+    if(target===null)break;
+
+    /* Place break dealer at target */
+    assigned.set(target,entrant);
     usedIds.add(entrant.id);
 
-    let displaced=currentBySlot.get(slot);
-    if(!displaced||usedIds.has(displaced.id)){slot++;continue;}
+    let displaced=currentBySlot.get(target);
+    if(!displaced||usedIds.has(displaced.id))continue;
 
     /* breakFlag: force rest */
-    if(tables[slot]&&tables[slot].breakFlag){
+    if(tables[target]&&tables[target].breakFlag){
       restIds.add(displaced.id);usedIds.add(displaced.id);
-      slot++;continue;
+      continue;
     }
 
     if(myCascades>0){
-      /* Chain cascade of myCascades steps */
+      /* Chain cascade: displaced dealer moves to next slot, repeat */
       let cascaded=0;
       let current=displaced;
-      while(cascaded<myCascades&&slot+1<T&&!assigned.has(slot+1)){
-        const nextSlot=slot+1;
+      let curSlot=target;
+      while(cascaded<myCascades&&cascadesLeft>0){
+        const nextSlot=(curSlot+1)%T;
+        if(assigned.has(nextSlot))break;
         assigned.set(nextSlot,current);
         shiftedIds.add(current.id);
         usedIds.add(current.id);
         cascadesLeft--;
         cascaded++;
-        slot=nextSlot;
-        /* Next dealer to potentially cascade */
+        curSlot=nextSlot;
         const nextD=currentBySlot.get(nextSlot);
         if(!nextD||usedIds.has(nextD.id))break;
         current=nextD;
       }
-      /* After cascade chain: `current` is the last displaced dealer → rest */
+      /* Last displaced rests */
       if(current&&!usedIds.has(current.id)){
         restIds.add(current.id);usedIds.add(current.id);
       }
     }else{
-      /* No cascade allotted — displaced rests */
       restIds.add(displaced.id);usedIds.add(displaced.id);
     }
-    slot++;
   }
 
   /* Any on-table dealer not placed = rest */
